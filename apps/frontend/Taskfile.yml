@@ -1,0 +1,85 @@
+version: '3'
+
+vars:
+  FRONTEND_URL: '{{default "http://localhost:5173" .FRONTEND_URL}}'
+  API_URL: '{{default "http://localhost:8000" .API_URL}}'
+
+tasks:
+  default:
+    desc: Muestra la ayuda de tareas disponibles
+    silent: true
+    cmds:
+      - task --list
+
+  dev:
+    desc: Inicia el servidor de desarrollo Vite
+    cmds:
+      - npm run dev
+
+  build:
+    desc: Build de producción
+    cmds:
+      - npm run build
+
+  preview:
+    desc: Preview del build de producción
+    cmds:
+      - npm run preview
+
+  lint:
+    desc: Chequeo de tipos TypeScript
+    cmds:
+      - npm run lint
+
+  deps:install:
+    desc: Instala dependencias npm
+    cmds:
+      - npm install
+
+  deps:update:
+    desc: Actualiza dependencias npm
+    cmds:
+      - npm update
+
+  test:e2e:
+    desc: Ejecuta todos los tests E2E con Playwright (1 worker, navegador visible)
+    summary: |
+      Requiere:
+        - Backend corriendo en http://localhost:8000
+        - Frontend corriendo en http://localhost:5173
+      Corre secuencialmente en 1 solo hilo con ventana visible y slowMo.
+    cmds:
+      - echo "🧪 Ejecutando tests E2E con Playwright (1 worker, visible)..."
+      - FRONTEND_URL={{.FRONTEND_URL}} API_URL={{.API_URL}} npx playwright test --workers=1 --headed
+
+  test:e2e:headless:
+    desc: Ejecuta tests E2E sin abrir navegador
+    cmds:
+      - FRONTEND_URL={{.FRONTEND_URL}} API_URL={{.API_URL}} npx playwright test --workers=1
+
+  test:e2e:ui:
+    desc: Abre Playwright UI mode para debug
+    cmds:
+      - FRONTEND_URL={{.FRONTEND_URL}} API_URL={{.API_URL}} npx playwright test --ui
+
+  test:e2e:report:
+    desc: Muestra el reporte HTML del último test
+    cmds:
+      - npx playwright show-report
+
+  playwright:install:
+    desc: Instala browsers de Playwright
+    cmds:
+      - npx playwright install chromium
+
+  playwright:codegen:
+    desc: Abre Playwright codegen para grabar interacciones
+    cmds:
+      - npx playwright codegen {{.FRONTEND_URL}}
+
+  clean:
+    desc: Limpia build y caché
+    cmds:
+      - rm -rf dist/
+      - rm -rf node_modules/.vite
+      - echo "🧹 Limpieza completa"

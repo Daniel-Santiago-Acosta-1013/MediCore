@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: medicore-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./apps/api/.env.example
+    networks:
+      - medicore-network
+
+  frontend:
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile
+    container_name: medicore-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - medicore-network
+
+  # Descomenta para usar PostgreSQL local
+  # db:
+  #   image: postgres:16-alpine
+  #   container_name: medicore-db
+  #   environment:
+  #     POSTGRES_USER: medicore
+  #     POSTGRES_PASSWORD: medicore
+  #     POSTGRES_DB: medicore
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - medicore-network
+
+networks:
+  medicore-network:
+    driver: bridge
+
+# volumes:
+#   postgres_data:

@@ -1,0 +1,12 @@
+%syntax-version=1.0.0
+%project=medicore
+%uri=https://github.com/medicore/api
+
+users 2024-05-01T00:00:00Z admin <admin@medicore.com> # Crear tabla users
+patients 2024-05-01T00:00:01Z admin <admin@medicore.com> # Crear tabla patients
+doctors 2024-05-01T00:00:02Z admin <admin@medicore.com> # Crear tabla doctors
+appointments 2024-05-01T00:00:03Z admin <admin@medicore.com> # Crear tabla appointments
+medical_records 2024-05-01T00:00:04Z admin <admin@medicore.com> # Crear tabla medical_records
+medical_orders 2024-05-01T00:00:05Z admin <admin@medicore.com> # Crear tabla medical_orders
+invoices 2024-05-01T00:00:06Z admin <admin@medicore.com> # Crear tabla invoices
+audit_logs 2024-05-01T00:00:07Z admin <admin@medicore.com> # Crear tabla audit_logs
