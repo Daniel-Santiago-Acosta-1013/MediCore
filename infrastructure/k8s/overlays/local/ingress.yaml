@@ -16,10 +16,3 @@ spec:
             name: frontend-app
             port:
               number: 80
-      - path: /api
-        pathType: Prefix
-        backend:
-          service:
-            name: api-gateway
-            port:
-              number: 80

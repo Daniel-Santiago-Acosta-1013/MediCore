@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: medicore-db
+    hostname: medicore-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: medicore
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: medicore
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medicore -d medicore"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:

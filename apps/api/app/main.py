@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from app.modules.auth.router import router as auth_router
 from app.modules.users.router import router as users_router
@@ -9,7 +10,8 @@ from app.modules.medical_orders.router import router as medical_orders_router
 from app.modules.billing.router import router as billing_router
 from app.modules.audit.router import router as audit_router
 
-app = FastAPI(title="MediCore API", version="0.1.0")
+root_path = os.getenv("FASTAPI_ROOT_PATH", "")
+app = FastAPI(title="MediCore API", version="0.1.0", root_path=root_path)
 
 app.include_router(auth_router)
 app.include_router(users_router)

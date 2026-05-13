@@ -1,0 +1,17 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: api-gateway
+  namespace: medicore-api
+spec:
+  entryPoints:
+    - web
+  routes:
+  - match: PathPrefix(`/api`)
+    kind: Rule
+    services:
+    - name: local-api-gateway-dev
+      port: 80
+    middlewares:
+    - name: local-strip-api-prefix-dev
+      namespace: medicore-api

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-config
+  namespace: medicore-api
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/part-of: medicore
+data:
+  FASTAPI_ROOT_PATH: "/api"
+  DATABASE_URL: "postgresql://medicore:secret@host.k3d.internal:5432/medicore"
+  POSTGRES_HOST: "host.k3d.internal"
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: "medicore"
+  POSTGRES_PASSWORD: "secret"
+  POSTGRES_DB: "medicore"
+  SECRET_KEY: "local-secret-key-change-in-production"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+  ALGORITHM: "HS256"
