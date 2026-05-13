@@ -21,7 +21,8 @@ spec:
     spec:
       containers:
       - name: frontend-app
-        image: nginx:alpine
+        image: medicore-frontend:local
+        imagePullPolicy: Never
         ports:
         - name: http
           containerPort: 80
