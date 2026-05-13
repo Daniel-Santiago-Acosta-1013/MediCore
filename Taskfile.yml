@@ -1,0 +1,119 @@
+version: '3'
+
+vars:
+  CLUSTER_NAME: medicore-dev
+  K8S_DIR: infrastructure/k8s
+  API_DIR: apps/api
+  FRONTEND_DIR: apps/frontend
+
+tasks:
+  default:
+    desc: Muestra las tareas disponibles
+    silent: true
+    cmds:
+      - task --list
+
+  # ------------------------------------------------------------------
+  # Cluster (k3d)
+  # ------------------------------------------------------------------
+
+  cluster:up:
+    desc: Crea el cluster k3d y aplica la infraestructura
+    cmds:
+      - |
+        if k3d cluster list | grep -q "{{.CLUSTER_NAME}}"; then
+          echo "⚠️  Cluster '{{.CLUSTER_NAME}}' ya existe. Usá 'task infra:apply' para reaplicar."
+        else
+          echo "🚀 Creando cluster '{{.CLUSTER_NAME}}'..."
+          k3d cluster create {{.CLUSTER_NAME}} --servers 1 --agents 2 \
+            --port "80:80@loadbalancer" \
+            --port "443:443@loadbalancer"
+        fi
+      - task: infra:apply
+      - echo "✅ MediCore cluster listo. Verificá con: task cluster:status"
+
+  cluster:down:
+    desc: Destruye el cluster k3d completamente
+    cmds:
+      - echo "💥 Destruyendo cluster '{{.CLUSTER_NAME}}'..."
+      - k3d cluster delete {{.CLUSTER_NAME}}
+      - echo "🧹 Cluster eliminado."
+
+  cluster:status:
+    desc: Muestra estado del cluster y pods de MediCore
+    cmds:
+      - echo "=== NODES ===" && kubectl get nodes
+      - echo "=== NAMESPACES ===" && kubectl get ns -l app.kubernetes.io/part-of=medicore
+      - echo "=== PODS ===" && kubectl get pods -n medicore-api && kubectl get pods -n medicore-frontend
+
+  # ------------------------------------------------------------------
+  # Infraestructura (Kustomize)
+  # ------------------------------------------------------------------
+
+  infra:apply:
+    desc: Aplica manifiestos Kubernetes del overlay local
+    cmds:
+      - kubectl apply -k {{.K8S_DIR}}/overlays/local/
+      - echo "⏳ Esperando que los pods estén listos..."
+      - kubectl wait --for=condition=ready pod -l app.kubernetes.io/part-of=medicore --all-namespaces --timeout=60s
+      - echo "✅ Infraestructura aplicada."
+
+  infra:destroy:
+    desc: Elimina todos los recursos de MediCore del cluster
+    cmds:
+      - kubectl delete -k {{.K8S_DIR}}/overlays/local/ --ignore-not-found=true
+      - echo "🧹 Recursos de MediCore eliminados."
+
+  infra:diff:
+    desc: Muestra diferencias entre lo declarado y lo corriendo
+    cmds:
+      - kubectl diff -k {{.K8S_DIR}}/overlays/local/ || true
+
+  # ------------------------------------------------------------------
+  # Tests
+  # ------------------------------------------------------------------
+
+  test:api:
+    desc: Corre tests unitarios del API localmente con uv
+    dir: "{{.API_DIR}}"
+    cmds:
+      - uv run pytest app/tests -v
+
+  test:frontend:
+    desc: Corre tests unitarios/lint del frontend
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - npm run lint
+
+  # ------------------------------------------------------------------
+  # Observabilidad
+  # ------------------------------------------------------------------
+
+  k9s:
+    desc: Abre k9s en el namespace medicore-api
+    cmds:
+      - k9s -n medicore-api
+
+  k9s:all:
+    desc: Abre k9s viendo todos los namespaces
+    cmds:
+      - k9s --all-namespaces
+
+  # ------------------------------------------------------------------
+  # Debug
+  # ------------------------------------------------------------------
+
+  port-forward:api:
+    desc: Port-forward del API Gateway a localhost:8080
+    cmds:
+      - kubectl port-forward -n medicore-api svc/local-api-gateway-dev 8080:80
+
+  logs:api:
+    desc: Logs en vivo del API Gateway
+    cmds:
+      - kubectl logs -n medicore-api deployment/local-api-gateway-dev -f
+
+  logs:frontend:
+    desc: Logs en vivo del Frontend
+    cmds:
+      - kubectl logs -n medicore-frontend deployment/local-frontend-app-dev -f
