@@ -71,14 +71,14 @@ tasks:
             --port "443:443@loadbalancer"
         fi
       - task infra:apply
-      - echo "✅ MediCore listo. API: http://localhost/api  Frontend: http://localhost"
+      - 'echo "✅ MediCore listo. API: http://localhost/api  Frontend: http://localhost"'
 
   cluster:down:
     desc: Destruye SOLO el cluster k3d (la DB sigue viva)
     cmds:
       - echo "💥 Destruyendo cluster k3d..."
       - k3d cluster delete {{.CLUSTER_NAME}}
-      - echo "💡 La DB sigue corriendo. Para detenerla: task db:down"
+      - 'echo "💡 La DB sigue corriendo. Para detenerla: task db:down"'
 
   cluster:destroy:
     desc: Destruye TODO (cluster k3d + PostgreSQL + datos)
