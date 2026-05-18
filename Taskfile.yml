@@ -1,181 +1,147 @@
-version: '3'
+version: "3"
 
 vars:
-  CLUSTER_NAME: medicore-dev
-  K8S_DIR: infrastructure/k8s
-  API_DIR: apps/api
-  FRONTEND_DIR: apps/frontend
+  K8S_OVERLAY: infrastructure/k8s/overlays/local
+  API_IMAGE: medicore-api
+  FRONTEND_IMAGE: medicore-frontend
+  DB_COMPOSE: docker-compose.db.yml
+  TRAEFIK_NAMESPACE: traefik
+  TRAEFIK_RELEASE: traefik
 
 tasks:
   default:
-    desc: Muestra las tareas disponibles
-    silent: true
     cmds:
       - task --list
 
-  # ------------------------------------------------------------------
-  # Base de datos (Docker nativo, fuera del cluster)
-  # ------------------------------------------------------------------
-
   db:up:
-    desc: Levanta PostgreSQL en Docker nativo (persistente)
+    desc: Levantar PostgreSQL
     cmds:
-      - docker compose -f docker-compose.db.yml up -d
+      - docker compose -f {{.DB_COMPOSE}} up -d
       - |
-        echo "⏳ Esperando PostgreSQL..."
-        for i in {1..30}; do
-          if docker compose -f docker-compose.db.yml exec -T db pg_isready -U medicore -d medicore > /dev/null 2>&1; then
-            echo "✅ PostgreSQL listo en localhost:5432"
+        for attempt in $(seq 1 30); do
+          if docker compose -f {{.DB_COMPOSE}} exec -T db pg_isready -U medicore -d medicore >/dev/null 2>&1; then
+            docker compose -f {{.DB_COMPOSE}} exec -T db pg_isready -U medicore -d medicore
             exit 0
           fi
           sleep 1
         done
-        echo "❌ PostgreSQL no respondió a tiempo"
+        docker compose -f {{.DB_COMPOSE}} logs db
         exit 1
 
   db:down:
-    desc: Detiene PostgreSQL (conserva datos en volumen)
+    desc: Detener PostgreSQL (conserva datos)
     cmds:
-      - docker compose -f docker-compose.db.yml down
+      - docker compose -f {{.DB_COMPOSE}} down
 
   db:destroy:
-    desc: Destruye PostgreSQL y borra todos los datos
+    desc: Destruir PostgreSQL y borrar datos
+    prompt: Esto elimina el volumen local de PostgreSQL. Continuar?
     cmds:
-      - docker compose -f docker-compose.db.yml down -v
-
-  db:logs:
-    desc: Logs de PostgreSQL
-    cmds:
-      - docker compose -f docker-compose.db.yml logs -f
+      - docker compose -f {{.DB_COMPOSE}} down -v
 
   db:shell:
-    desc: Abre psql en el contenedor de PostgreSQL
+    desc: Abrir psql
     cmds:
-      - docker compose -f docker-compose.db.yml exec db psql -U medicore -d medicore
-
-  # ------------------------------------------------------------------
-  # Cluster (k3d) + Infraestructura
-  # ------------------------------------------------------------------
+      - docker compose -f {{.DB_COMPOSE}} exec db psql -U medicore -d medicore
 
   cluster:up:
-    desc: Levanta DB + cluster k3d + aplica infraestructura
+    desc: Configurar cluster + Traefik + aplicar infra
     cmds:
-      - task db:up
-      - |
-        if k3d cluster list | grep -q "{{.CLUSTER_NAME}}"; then
-          echo "⚠️  Cluster '{{.CLUSTER_NAME}}' ya existe."
-        else
-          echo "🚀 Creando cluster k3d..."
-          k3d cluster create {{.CLUSTER_NAME}} --servers 1 --agents 2 \
-            --port "80:80@loadbalancer" \
-            --port "443:443@loadbalancer"
-        fi
-      - task infra:apply
-      - 'echo "✅ MediCore listo. API: http://localhost/api  Frontend: http://localhost"'
+      - task: db:up
+      - task: _cluster:check
+      - task: _traefik:up
+      - task: infra:apply
 
   cluster:down:
-    desc: Destruye SOLO el cluster k3d (la DB sigue viva)
+    desc: Eliminar recursos de MediCore del cluster
     cmds:
-      - echo "💥 Destruyendo cluster k3d..."
-      - k3d cluster delete {{.CLUSTER_NAME}}
-      - 'echo "💡 La DB sigue corriendo. Para detenerla: task db:down"'
+      - task: infra:destroy
 
   cluster:destroy:
-    desc: Destruye TODO (cluster k3d + PostgreSQL + datos)
+    desc: Destruir TODO (recursos + DB + datos)
+    prompt: Esto elimina recursos Kubernetes locales, Traefik y datos de PostgreSQL. Continuar?
     cmds:
-      - k3d cluster delete {{.CLUSTER_NAME}} 2>/dev/null || true
-      - docker compose -f docker-compose.db.yml down -v 2>/dev/null || true
-      - echo "🧹 Todo destruido."
+      - task: infra:destroy
+      - task: _traefik:down
+      - docker compose -f {{.DB_COMPOSE}} down -v
 
   cluster:status:
-    desc: Estado del cluster y pods de MediCore
+    desc: Estado de nodos y pods
     cmds:
-      - echo "=== NODES ===" && kubectl get nodes
-      - echo "=== NAMESPACES ===" && kubectl get ns -l app.kubernetes.io/part-of=medicore
-      - echo "=== PODS ===" && kubectl get pods -n medicore-api && kubectl get pods -n medicore-frontend
-
-  # ------------------------------------------------------------------
-  # Infraestructura Kubernetes (Kustomize)
-  # ------------------------------------------------------------------
-
-  infra:apply:
-    desc: Aplica manifiestos Kubernetes del overlay local
-    cmds:
-      - kubectl apply -k {{.K8S_DIR}}/overlays/local/
-      - echo "⏳ Esperando pods..."
-      - kubectl wait --for=condition=ready pod -l app.kubernetes.io/part-of=medicore --all-namespaces --timeout=120s
-      - echo "✅ Infraestructura aplicada."
-
-  infra:destroy:
-    desc: Elimina todos los recursos de MediCore del cluster
-    cmds:
-      - kubectl delete -k {{.K8S_DIR}}/overlays/local/ --ignore-not-found=true
-
-  # ------------------------------------------------------------------
-  # Build e importación de imágenes locales
-  # ------------------------------------------------------------------
+      - kubectl get nodes
+      - kubectl get pods,svc,ingress -n medicore-api
+      - kubectl get pods,svc,ingress -n medicore-frontend
 
   build:api:
-    desc: Construye imagen Docker de la API y la carga al cluster k3d
-    dir: "{{.API_DIR}}"
+    desc: Build imagen de la API
     cmds:
-      - docker build -t medicore-api:local .
-      - k3d image import medicore-api:local -c {{.CLUSTER_NAME}}
-      - echo "✅ Imagen medicore-api:local cargada en el cluster"
+      - docker build -t {{.API_IMAGE}} -t {{.API_IMAGE}}:local apps/api
 
   build:frontend:
-    desc: Construye imagen Docker del Frontend y la carga al cluster k3d
-    dir: "{{.FRONTEND_DIR}}"
+    desc: Build imagen del frontend
     cmds:
-      - docker build -t medicore-frontend:local .
-      - k3d image import medicore-frontend:local -c {{.CLUSTER_NAME}}
-      - echo "✅ Imagen medicore-frontend:local cargada en el cluster"
+      - docker build -t {{.FRONTEND_IMAGE}} -t {{.FRONTEND_IMAGE}}:local apps/frontend
 
-  # ------------------------------------------------------------------
-  # Tests
-  # ------------------------------------------------------------------
-
-  test:api:
-    desc: Tests unitarios del API localmente con uv
-    dir: "{{.API_DIR}}"
+  infra:apply:
+    desc: Aplicar manifiestos Kubernetes
     cmds:
-      - uv run pytest app/tests -v
+      - skaffold run
 
-  test:frontend:
-    desc: Lint del frontend
-    dir: "{{.FRONTEND_DIR}}"
+  infra:destroy:
+    desc: Eliminar recursos de MediCore del cluster
     cmds:
-      - npm run lint
-
-  # ------------------------------------------------------------------
-  # Observabilidad
-  # ------------------------------------------------------------------
+      - skaffold delete
 
   k9s:
-    desc: Abre k9s en el namespace medicore-api
+    desc: Abrir k9s en medicore-api
     cmds:
       - k9s -n medicore-api
 
   k9s:all:
-    desc: Abre k9s viendo todos los namespaces
+    desc: Abrir k9s en todos los namespaces
     cmds:
       - k9s --all-namespaces
 
-  # ------------------------------------------------------------------
-  # Debug
-  # ------------------------------------------------------------------
-
-  port-forward:api:
-    desc: Port-forward del API Gateway a localhost:8080
-    cmds:
-      - kubectl port-forward -n medicore-api svc/local-api-gateway-dev 8080:80
-
   logs:api:
-    desc: Logs en vivo del API Gateway
+    desc: Logs del API Gateway
     cmds:
-      - kubectl logs -n medicore-api deployment/local-api-gateway-dev -f
+      - kubectl logs -n medicore-api deployment/local-api-gateway-dev -f --tail=100
 
   logs:frontend:
-    desc: Logs en vivo del Frontend
+    desc: Logs del Frontend
     cmds:
-      - kubectl logs -n medicore-frontend deployment/local-frontend-app-dev -f
+      - kubectl logs -n medicore-frontend deployment/local-frontend-app-dev -f --tail=100
+
+  test:api:
+    desc: Tests unitarios del API (local con uv)
+    deps:
+      - db:up
+    dir: apps/api
+    env:
+      TEST_DATABASE_URL: postgresql://medicore:secret@localhost:5432/medicore
+    cmds:
+      - uv run python -m pytest
+
+  test:frontend:
+    desc: Lint del frontend
+    dir: apps/frontend
+    cmds:
+      - npm run lint
+
+  _cluster:check:
+    internal: true
+    cmds:
+      - kubectl config current-context
+      - kubectl get nodes
+
+  _traefik:up:
+    internal: true
+    cmds:
+      - helm repo add traefik https://traefik.github.io/charts
+      - helm repo update
+      - helm upgrade --install {{.TRAEFIK_RELEASE}} traefik/traefik --namespace {{.TRAEFIK_NAMESPACE}} --create-namespace --set service.type=LoadBalancer --set ports.web.exposedPort=80 --set ports.websecure.exposedPort=443 --wait --timeout 5m
+
+  _traefik:down:
+    internal: true
+    cmds:
+      - helm uninstall {{.TRAEFIK_RELEASE}} --namespace {{.TRAEFIK_NAMESPACE}} --ignore-not-found

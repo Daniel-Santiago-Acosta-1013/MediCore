@@ -21,8 +21,8 @@ spec:
     spec:
       containers:
       - name: api-gateway
-        image: medicore-api:local
-        imagePullPolicy: Never
+        image: medicore-api
+        imagePullPolicy: IfNotPresent
         ports:
         - name: http
           containerPort: 8000

@@ -1,0 +1,41 @@
+apiVersion: skaffold/v4beta13
+kind: Config
+metadata:
+  name: medicore-local
+
+build:
+  local:
+    push: false
+    useBuildkit: true
+    concurrency: 2
+  tagPolicy:
+    inputDigest: {}
+  artifacts:
+    - image: medicore-api
+      context: apps/api
+      docker:
+        dockerfile: Dockerfile
+    - image: medicore-frontend
+      context: apps/frontend
+      docker:
+        dockerfile: Dockerfile
+
+manifests:
+  kustomize:
+    paths:
+      - infrastructure/k8s/overlays/local
+
+deploy:
+  kubectl: {}
+
+portForward:
+  - resourceType: service
+    resourceName: local-frontend-app-dev
+    namespace: medicore-frontend
+    port: 80
+    localPort: 8080
+  - resourceType: service
+    resourceName: local-api-gateway-dev
+    namespace: medicore-api
+    port: 80
+    localPort: 8000

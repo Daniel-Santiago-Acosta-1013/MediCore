@@ -21,8 +21,8 @@ spec:
     spec:
       containers:
       - name: frontend-app
-        image: medicore-frontend:local
-        imagePullPolicy: Never
+        image: medicore-frontend
+        imagePullPolicy: IfNotPresent
         ports:
         - name: http
           containerPort: 80

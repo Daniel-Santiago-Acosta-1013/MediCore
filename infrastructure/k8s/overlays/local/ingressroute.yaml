@@ -10,8 +10,8 @@ spec:
   - match: PathPrefix(`/api`)
     kind: Rule
     services:
-    - name: local-api-gateway-dev
+    - name: api-gateway
       port: 80
     middlewares:
-    - name: local-strip-api-prefix-dev
+    - name: strip-api-prefix
       namespace: medicore-api

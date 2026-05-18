@@ -8,8 +8,8 @@ metadata:
     app.kubernetes.io/part-of: medicore
 data:
   FASTAPI_ROOT_PATH: "/api"
-  DATABASE_URL: "postgresql://medicore:secret@host.k3d.internal:5432/medicore"
-  POSTGRES_HOST: "host.k3d.internal"
+  DATABASE_URL: "postgresql://medicore:secret@host.docker.internal:5432/medicore"
+  POSTGRES_HOST: "host.docker.internal"
   POSTGRES_PORT: "5432"
   POSTGRES_USER: "medicore"
   POSTGRES_PASSWORD: "secret"
