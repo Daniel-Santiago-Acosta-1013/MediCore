@@ -6,10 +6,38 @@ class AppointmentRepository:
     def __init__(self, conn: Connection):
         self.conn = conn
 
+    def _appointment_columns(self) -> str:
+        return """
+            a.id,
+            a.patient_id,
+            a.doctor_id,
+            a.appointment_date,
+            a.status,
+            a.notes,
+            a.created_at,
+            a.updated_at,
+            COALESCE(pu.full_name, 'Paciente') as patient_name,
+            COALESCE(du.full_name, 'Doctor') as doctor_name
+        """
+
+    def _appointment_from(self) -> str:
+        return """
+            appointments a
+            LEFT JOIN patients p ON p.id = a.patient_id
+            LEFT JOIN users pu ON pu.id = p.user_id
+            LEFT JOIN doctors d ON d.id = a.doctor_id
+            LEFT JOIN users du ON du.id = d.user_id
+        """
+
     def list_appointments(self, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
         with self.conn.cursor() as cur:
             cur.execute(
-                "SELECT id, patient_id, doctor_id, appointment_date, status, notes, created_at, updated_at FROM appointments ORDER BY appointment_date DESC LIMIT %s OFFSET %s",
+                f"""
+                SELECT {self._appointment_columns()}
+                FROM {self._appointment_from()}
+                ORDER BY a.appointment_date DESC
+                LIMIT %s OFFSET %s
+                """,
                 (limit, offset),
             )
             rows = cur.fetchall()
@@ -19,7 +47,11 @@ class AppointmentRepository:
     def get_appointment_by_id(self, appointment_id: str) -> Optional[Dict[str, Any]]:
         with self.conn.cursor() as cur:
             cur.execute(
-                "SELECT id, patient_id, doctor_id, appointment_date, status, notes, created_at, updated_at FROM appointments WHERE id = %s",
+                f"""
+                SELECT {self._appointment_columns()}
+                FROM {self._appointment_from()}
+                WHERE a.id = %s
+                """,
                 (appointment_id,),
             )
             row = cur.fetchone()

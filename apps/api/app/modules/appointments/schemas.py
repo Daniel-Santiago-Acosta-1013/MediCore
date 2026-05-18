@@ -26,5 +26,7 @@ class AppointmentOut(BaseModel):
     appointment_date: datetime
     status: str
     notes: Optional[str] = None
+    patient_name: Optional[str] = None
+    doctor_name: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
