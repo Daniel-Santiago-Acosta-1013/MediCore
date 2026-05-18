@@ -67,6 +67,11 @@ task logs:frontend          # Logs del Frontend
 
 task test:api               # Tests unitarios del API (local con uv)
 task test:frontend          # Lint del frontend
+
+task observability:install  # Instalar Prometheus + Grafana + node-exporter + kube-state-metrics
+task observability:routes   # Aplicar IngressRoute de Traefik para Grafana y Prometheus
+task observability:grafana  # Abrir Grafana en el navegador (http://grafana.localhost)
+task observability:prometheus # Abrir Prometheus en el navegador (http://prometheus.localhost)
 ```
 
 ## URLs locales
@@ -76,6 +81,8 @@ task test:frontend          # Lint del frontend
 | Frontend | http://localhost/ |
 | API health | http://localhost/api/health |
 | API docs | http://localhost/api/docs |
+| Grafana | http://grafana.localhost (user: `admin` / pass: `medicore`) |
+| Prometheus | http://prometheus.localhost |
 
 ## Estructura relevante
 

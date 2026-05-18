@@ -1,0 +1,49 @@
+# ============================================================================
+# Valores para kube-prometheus-stack en entorno local (Docker Desktop)
+# Namespace: medicore-monitoring-env-dev
+# ============================================================================
+
+grafana:
+  enabled: true
+  adminPassword: "medicore"
+  persistence:
+    enabled: false
+  sidecar:
+    dashboards:
+      enabled: true
+      searchNamespace: ALL
+  ingress:
+    enabled: false
+
+prometheus:
+  prometheusSpec:
+    # Retención de métricas para local (en memoria)
+    retention: 7d
+    retentionSize: "1GB"
+    storageSpec:
+      emptyDir:
+        medium: Memory
+    # Descubrimiento: aceptar TODOS los ServiceMonitors sin importar labels
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector: {}
+    podMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelector: {}
+    ruleSelectorNilUsesHelmValues: false
+    ruleSelector: {}
+    # Recursos mínimos para local
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "200m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+
+alertmanager:
+  enabled: false
+
+kube-state-metrics:
+  enabled: true
+
+prometheus-node-exporter:
+  enabled: true

@@ -12,6 +12,9 @@ vars:
   TRAEFIK_RELEASE: traefik
   METRICS_NAMESPACE: kube-system
   METRICS_RELEASE: metrics-server
+  MONITORING_NAMESPACE: medicore-monitoring-env-dev
+  OBSERVABILITY_RELEASE: medicore-observability
+  OBSERVABILITY_VALUES: infrastructure/k8s/observability/values.yaml
 
 tasks:
   default:
@@ -167,6 +170,41 @@ tasks:
     dir: apps/frontend
     cmds:
       - npm run lint
+
+  observability:install:
+    desc: Instalar stack de observabilidad (Prometheus + Grafana + node-exporter + kube-state-metrics)
+    cmds:
+      - helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      - helm repo update
+      - helm upgrade --install {{.OBSERVABILITY_RELEASE}} prometheus-community/kube-prometheus-stack --namespace {{.MONITORING_NAMESPACE}} --create-namespace --values {{.TASKFILE_DIR}}/{{.OBSERVABILITY_VALUES}} --wait --timeout 10m
+
+  observability:uninstall:
+    desc: Desinstalar stack de observabilidad
+    cmds:
+      - helm uninstall {{.OBSERVABILITY_RELEASE}} --namespace {{.MONITORING_NAMESPACE}} --ignore-not-found
+      - kubectl delete namespace {{.MONITORING_NAMESPACE}} --ignore-not-found
+
+  observability:routes:
+    desc: Aplicar IngressRoute de Traefik para Grafana y Prometheus
+    cmds:
+      - kubectl apply -f {{.TASKFILE_DIR}}/infrastructure/k8s/observability/ingressroute-grafana.yaml
+      - kubectl apply -f {{.TASKFILE_DIR}}/infrastructure/k8s/observability/ingressroute-prometheus.yaml
+      - echo "Grafana  -> http://grafana.localhost   (user: admin / pass: medicore)"
+      - echo "Prometheus -> http://prometheus.localhost"
+
+  observability:grafana:
+    desc: Abrir Grafana en el navegador (http://grafana.localhost)
+    cmds:
+      - echo "Grafana URL: http://grafana.localhost"
+      - echo "User: admin"
+      - echo "Password: medicore"
+      - open http://grafana.localhost || xdg-open http://grafana.localhost || echo "Abri http://grafana.localhost en tu navegador"
+
+  observability:prometheus:
+    desc: Abrir Prometheus en el navegador (http://prometheus.localhost)
+    cmds:
+      - echo "Prometheus URL: http://prometheus.localhost"
+      - open http://prometheus.localhost || xdg-open http://prometheus.localhost || echo "Abri http://prometheus.localhost en tu navegador"
 
   _cluster:check:
     internal: true
