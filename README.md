@@ -9,7 +9,7 @@ Sistema de gestión hospitalaria. Monorepo con frontend React, backend FastAPI e
 | Frontend | React 18 + TypeScript + Vite |
 | Backend | Python 3.12+ + FastAPI + Pydantic |
 | Base de datos | PostgreSQL 16 en Docker Compose |
-| Infraestructura local | Docker Desktop Kubernetes + Kustomize + Traefik |
+| Infraestructura local | Docker Desktop Kubernetes + Kustomize + Traefik + Metrics Server |
 | Pipeline local | Taskfile + Skaffold |
 
 ## Flujo local
@@ -22,7 +22,7 @@ Docker Desktop Kubernetes ejecuta el cluster local.
 task cluster:up
 ```
 
-Ese comando levanta PostgreSQL, valida el cluster local, instala o actualiza Traefik y aplica la infraestructura con Skaffold.
+Ese comando levanta PostgreSQL, valida el cluster local, instala o actualiza Traefik, instala o actualiza Metrics Server y aplica la infraestructura con Skaffold.
 
 ## Requisitos
 
@@ -95,3 +95,5 @@ infrastructure/k8s/overlays/local/
 - La API se conecta a PostgreSQL desde Kubernetes usando `host.docker.internal`.
 - Skaffold usa `push: false` para Docker Desktop Kubernetes.
 - Kustomize aplica `namePrefix` y `nameSuffix`; las referencias de Traefik se transforman con `kustomizeconfig.yaml`.
+- El HPA queda configurado para API y frontend desde `task cluster:up`, usando CPU como señal de escalado.
+- Metrics Server se instala internamente en `kube-system` porque HPA necesita métricas de CPU y memoria.

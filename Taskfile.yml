@@ -7,6 +7,8 @@ vars:
   DB_COMPOSE: docker-compose.db.yml
   TRAEFIK_NAMESPACE: traefik
   TRAEFIK_RELEASE: traefik
+  METRICS_NAMESPACE: kube-system
+  METRICS_RELEASE: metrics-server
 
 tasks:
   default:
@@ -50,6 +52,7 @@ tasks:
       - task: db:up
       - task: _cluster:check
       - task: _traefik:up
+      - task: _metrics:up
       - task: infra:apply
 
   cluster:down:
@@ -62,6 +65,7 @@ tasks:
     prompt: Esto elimina recursos Kubernetes locales, Traefik y datos de PostgreSQL. Continuar?
     cmds:
       - task: infra:destroy
+      - task: _metrics:down
       - task: _traefik:down
       - docker compose -f {{.DB_COMPOSE}} down -v
 
@@ -69,8 +73,8 @@ tasks:
     desc: Estado de nodos y pods
     cmds:
       - kubectl get nodes
-      - kubectl get pods,svc,ingress -n medicore-api
-      - kubectl get pods,svc,ingress -n medicore-frontend
+      - kubectl get pods,deploy,hpa,svc,ingress -n medicore-api
+      - kubectl get pods,deploy,hpa,svc,ingress -n medicore-frontend
 
   build:api:
     desc: Build imagen de la API
@@ -145,3 +149,15 @@ tasks:
     internal: true
     cmds:
       - helm uninstall {{.TRAEFIK_RELEASE}} --namespace {{.TRAEFIK_NAMESPACE}} --ignore-not-found
+
+  _metrics:up:
+    internal: true
+    cmds:
+      - helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+      - helm repo update
+      - helm upgrade --install {{.METRICS_RELEASE}} metrics-server/metrics-server --namespace {{.METRICS_NAMESPACE}} --set 'args={--kubelet-insecure-tls}' --wait --timeout 5m
+
+  _metrics:down:
+    internal: true
+    cmds:
+      - helm uninstall {{.METRICS_RELEASE}} --namespace {{.METRICS_NAMESPACE}} --ignore-not-found
