@@ -1,4 +1,5 @@
 import './Sidebar.css'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '@/stores/AuthContext'
 import type { User } from '@/types'
 
@@ -19,7 +20,7 @@ const navItems: Array<{ path: string; label: string; icon: string; allowedRoles:
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { user } = useAuth()
-  const location = window.location
+  const location = useLocation()
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/'

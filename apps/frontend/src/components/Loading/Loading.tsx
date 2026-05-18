@@ -1,10 +1,17 @@
+import { Oval } from 'react-loader-spinner'
 import './Loading.css'
 
-export function Loading({ message = 'Cargando...' }: { message?: string }) {
+export function Loading() {
   return (
     <div className="loading">
-      <div className="spinner" />
-      <span>{message}</span>
+      <Oval
+        height={48}
+        width={48}
+        color="var(--color-primary)"
+        secondaryColor="var(--color-border)"
+        strokeWidth={4}
+        strokeWidthSecondary={4}
+      />
     </div>
   )
 }
