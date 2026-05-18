@@ -2,7 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: medicore-ingress
-  namespace: medicore-frontend
+  namespace: medicore-env-dev
   annotations:
     ingress.kubernetes.io/ssl-redirect: "false"
 spec:

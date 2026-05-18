@@ -110,8 +110,7 @@ tasks:
     desc: Estado de nodos y pods
     cmds:
       - kubectl get nodes
-      - kubectl get pods,deploy,hpa,svc,ingress -n medicore-api
-      - kubectl get pods,deploy,hpa,svc,ingress -n medicore-frontend
+      - kubectl get pods,deploy,hpa,svc,ingress -n medicore-env-dev
 
   build:api:
     desc: Build imagen de la API
@@ -134,9 +133,9 @@ tasks:
       - skaffold delete
 
   k9s:
-    desc: Abrir k9s en medicore-api
+    desc: Abrir k9s en medicore-env-dev
     cmds:
-      - k9s -n medicore-api
+      - k9s -n medicore-env-dev
 
   k9s:all:
     desc: Abrir k9s en todos los namespaces
@@ -146,12 +145,12 @@ tasks:
   logs:api:
     desc: Logs del API Gateway
     cmds:
-      - kubectl logs -n medicore-api deployment/local-api-gateway-dev -f --tail=100
+      - kubectl logs -n medicore-env-dev deployment/local-api-gateway-dev -f --tail=100
 
   logs:frontend:
     desc: Logs del Frontend
     cmds:
-      - kubectl logs -n medicore-frontend deployment/local-frontend-app-dev -f --tail=100
+      - kubectl logs -n medicore-env-dev deployment/local-frontend-app-dev -f --tail=100
 
   test:api:
     desc: Tests unitarios del API (local con uv)

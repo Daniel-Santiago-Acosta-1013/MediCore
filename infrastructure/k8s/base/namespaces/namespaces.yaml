@@ -1,25 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: medicore-system
-  labels:
-    environment: local
-    app.kubernetes.io/part-of: medicore
-    app.kubernetes.io/managed-by: kustomize
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: medicore-api
-  labels:
-    environment: local
-    app.kubernetes.io/part-of: medicore
-    app.kubernetes.io/managed-by: kustomize
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: medicore-frontend
+  name: medicore-env-dev
   labels:
     environment: local
     app.kubernetes.io/part-of: medicore

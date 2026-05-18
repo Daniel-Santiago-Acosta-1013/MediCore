@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: patient-service
-  namespace: medicore-api
+  namespace: medicore-env-dev
   labels:
     app.kubernetes.io/name: patient-service
     app.kubernetes.io/component: microservice

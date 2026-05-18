@@ -2,7 +2,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: frontend-app
-  namespace: medicore-frontend
+  namespace: medicore-env-dev
   labels:
     app.kubernetes.io/name: frontend-app
     app.kubernetes.io/component: web-ui

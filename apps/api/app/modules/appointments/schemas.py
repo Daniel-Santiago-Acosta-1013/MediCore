@@ -4,7 +4,7 @@ from typing import Optional
 
 
 class AppointmentCreate(BaseModel):
-    patient_id: str
+    patient_id: Optional[str] = None
     doctor_id: str
     appointment_date: datetime
     status: Optional[str] = "SCHEDULED"
