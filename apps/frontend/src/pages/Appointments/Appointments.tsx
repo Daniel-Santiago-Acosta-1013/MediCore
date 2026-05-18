@@ -1,23 +1,29 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { appointmentsApi } from '@/api/appointments'
+import { doctorsApi } from '@/api/doctors'
 import { Button } from '@/components/Button/Button'
 import { Input } from '@/components/Input/Input'
 import { Table } from '@/components/Table/Table'
 import { Modal } from '@/components/Modal/Modal'
 import { Loading } from '@/components/Loading/Loading'
 import { EmptyState } from '@/components/EmptyState/EmptyState'
-import type { Appointment } from '@/types'
+import { useAuth } from '@/stores/AuthContext'
+import type { Appointment, Doctor } from '@/types'
 import '../Users/Users.css'
 
 const statuses: Appointment['status'][] = ['SCHEDULED', 'COMPLETED', 'CANCELLED']
 
 export function Appointments() {
+  const { user } = useAuth()
   const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [doctors, setDoctors] = useState<Doctor[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null)
   const [formData, setFormData] = useState<Partial<Appointment>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const isPatient = user?.role === 'PATIENT'
 
   const fetchAppointments = useCallback(async () => {
     setIsLoading(true)
@@ -31,13 +37,26 @@ export function Appointments() {
     }
   }, [])
 
+  const fetchDoctors = useCallback(async () => {
+    try {
+      const data = await doctorsApi.list()
+      setDoctors(data)
+    } catch {
+      // silent
+    }
+  }, [])
+
   useEffect(() => {
     fetchAppointments()
-  }, [fetchAppointments])
+    fetchDoctors()
+  }, [fetchAppointments, fetchDoctors])
 
   const openCreate = () => {
     setEditingAppointment(null)
-    setFormData({ status: 'SCHEDULED' })
+    setFormData({
+      status: 'SCHEDULED',
+      patient_id: isPatient ? user?.id : undefined,
+    })
     setIsModalOpen(true)
   }
 
@@ -145,18 +164,30 @@ export function Appointments() {
       >
         <form className="crud-form" onSubmit={handleSubmit}>
           <div className="crud-form-row">
-            <Input
-              label="Paciente ID"
-              value={formData.patient_id || ''}
-              onChange={(e) => setFormData({ ...formData, patient_id: e.target.value })}
-              required
-            />
-            <Input
-              label="Doctor ID"
-              value={formData.doctor_id || ''}
-              onChange={(e) => setFormData({ ...formData, doctor_id: e.target.value })}
-              required
-            />
+            {!isPatient && (
+              <Input
+                label="Paciente ID"
+                value={formData.patient_id || ''}
+                onChange={(e) => setFormData({ ...formData, patient_id: e.target.value })}
+                required
+              />
+            )}
+            <div className="input-group" style={{ flex: 1 }}>
+              <label className="input-label">Doctor</label>
+              <select
+                className="input"
+                value={formData.doctor_id || ''}
+                onChange={(e) => setFormData({ ...formData, doctor_id: e.target.value })}
+                required
+              >
+                <option value="">Selecciona un doctor</option>
+                {doctors.map((doctor) => (
+                  <option key={doctor.id} value={doctor.id}>
+                    {doctor.full_name} — {doctor.specialty} ({doctor.license_number})
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <Input
             label="Fecha y hora"

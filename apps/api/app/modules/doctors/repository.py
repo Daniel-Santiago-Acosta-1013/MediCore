@@ -9,7 +9,13 @@ class DoctorRepository:
     def list_doctors(self, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
         with self.conn.cursor() as cur:
             cur.execute(
-                "SELECT id, user_id, license_number, specialty, phone, created_at, updated_at FROM doctors ORDER BY created_at DESC LIMIT %s OFFSET %s",
+                """
+                SELECT d.id, d.user_id, u.full_name, d.license_number, d.specialty, d.phone, d.created_at, d.updated_at
+                FROM doctors d
+                JOIN users u ON u.id = d.user_id
+                ORDER BY u.full_name
+                LIMIT %s OFFSET %s
+                """,
                 (limit, offset),
             )
             rows = cur.fetchall()
@@ -19,7 +25,12 @@ class DoctorRepository:
     def get_doctor_by_id(self, doctor_id: str) -> Optional[Dict[str, Any]]:
         with self.conn.cursor() as cur:
             cur.execute(
-                "SELECT id, user_id, license_number, specialty, phone, created_at, updated_at FROM doctors WHERE id = %s",
+                """
+                SELECT d.id, d.user_id, u.full_name, d.license_number, d.specialty, d.phone, d.created_at, d.updated_at
+                FROM doctors d
+                JOIN users u ON u.id = d.user_id
+                WHERE d.id = %s
+                """,
                 (doctor_id,),
             )
             row = cur.fetchone()

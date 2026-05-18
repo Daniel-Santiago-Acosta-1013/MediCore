@@ -10,3 +10,5 @@ medical_records 2024-05-01T00:00:04Z admin <admin@medicore.com> # Crear tabla me
 medical_orders 2024-05-01T00:00:05Z admin <admin@medicore.com> # Crear tabla medical_orders
 invoices 2024-05-01T00:00:06Z admin <admin@medicore.com> # Crear tabla invoices
 audit_logs 2024-05-01T00:00:07Z admin <admin@medicore.com> # Crear tabla audit_logs
+seed_users 2026-05-17T00:00:00Z admin <admin@medicore.com> # Insertar usuarios de prueba iniciales
+seed_profiles 2026-05-17T00:00:01Z admin <admin@medicore.com> # Insertar perfiles doctors y patients para usuarios seed

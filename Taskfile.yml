@@ -5,6 +5,9 @@ vars:
   API_IMAGE: medicore-api
   FRONTEND_IMAGE: medicore-frontend
   DB_COMPOSE: docker-compose.db.yml
+  DB_URL: db:pg://medicore:secret@host.docker.internal:5432/medicore
+  SQITCH_IMAGE: sqitch/sqitch
+  SQITCH_DIR: apps/api/db
   TRAEFIK_NAMESPACE: traefik
   TRAEFIK_RELEASE: traefik
   METRICS_NAMESPACE: kube-system
@@ -46,10 +49,44 @@ tasks:
     cmds:
       - docker compose -f {{.DB_COMPOSE}} exec db psql -U medicore -d medicore
 
+  db:migrate:
+    desc: Aplicar migraciones pendientes de la base de datos
+    deps:
+      - db:up
+    cmds:
+      - docker run --rm -v {{.TASKFILE_DIR}}/{{.SQITCH_DIR}}:/sqitch -w /sqitch {{.SQITCH_IMAGE}} deploy {{.DB_URL}}
+
+  db:migrate:status:
+    desc: Estado actual de las migraciones de Sqitch
+    cmds:
+      - docker run --rm -v {{.TASKFILE_DIR}}/{{.SQITCH_DIR}}:/sqitch -w /sqitch {{.SQITCH_IMAGE}} status {{.DB_URL}}
+
+  db:migrate:add:
+    desc: Crear una nueva migración (requiere NAME=migracion)
+    cmds:
+      - |
+        if [ -z "{{.NAME}}" ]; then
+          echo "Uso: task db:migrate:add NAME=nombre_de_la_migracion"
+          exit 1
+        fi
+        docker run --rm -v {{.TASKFILE_DIR}}/{{.SQITCH_DIR}}:/sqitch -w /sqitch {{.SQITCH_IMAGE}} add {{.NAME}}
+
+  db:migrate:revert:
+    desc: Revertir la última migración aplicada
+    prompt: Esto revertirá la última migración aplicada. ¿Continuar?
+    cmds:
+      - docker run --rm -v {{.TASKFILE_DIR}}/{{.SQITCH_DIR}}:/sqitch -w /sqitch {{.SQITCH_IMAGE}} revert {{.DB_URL}}
+
+  db:migrate:verify:
+    desc: Verificar que las migraciones aplicadas son correctas
+    cmds:
+      - docker run --rm -v {{.TASKFILE_DIR}}/{{.SQITCH_DIR}}:/sqitch -w /sqitch {{.SQITCH_IMAGE}} verify {{.DB_URL}}
+
   cluster:up:
     desc: Configurar cluster + Traefik + aplicar infra
     cmds:
       - task: db:up
+      - task: db:migrate
       - task: _cluster:check
       - task: _traefik:up
       - task: _metrics:up

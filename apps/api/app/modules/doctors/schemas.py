@@ -20,6 +20,7 @@ class DoctorUpdate(BaseModel):
 class DoctorOut(BaseModel):
     id: str
     user_id: str
+    full_name: str
     license_number: str
     specialty: str
     phone: Optional[str] = None

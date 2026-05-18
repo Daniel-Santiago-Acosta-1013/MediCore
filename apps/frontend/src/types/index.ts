@@ -40,7 +40,9 @@ export interface Patient {
 export interface Doctor {
   id: string;
   user_id: string;
+  full_name: string;
   license_number: string;
+  specialty: string;
   phone: string | null;
   created_at: string;
 }
