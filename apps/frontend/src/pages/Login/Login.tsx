@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/stores/AuthContext'
 import { parseApiError } from '@/utils/errors'
+import { useToast } from '@/stores/ToastContext'
 import { Input } from '@/components/Input/Input'
 import { Button } from '@/components/Button/Button'
 import './Login.css'
 
 export function Login() {
   const { login } = useAuth()
+  const { showToast } = useToast()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -19,8 +21,9 @@ export function Login() {
     setIsLoading(true)
     try {
       await login(email, password)
-    } catch (err) {
+    } catch (err: any) {
       setError(parseApiError(err))
+      showToast(err.message || 'Error al iniciar sesión', 'error')
     } finally {
       setIsLoading(false)
     }

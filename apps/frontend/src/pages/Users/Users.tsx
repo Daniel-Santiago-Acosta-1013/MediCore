@@ -7,11 +7,13 @@ import { Modal } from '@/components/Modal/Modal'
 import { Loading } from '@/components/Loading/Loading'
 import { EmptyState } from '@/components/EmptyState/EmptyState'
 import type { User, UserCreate } from '@/types'
+import { useToast } from '@/stores/ToastContext'
 import '../Users/Users.css'
 
 const roles: User['role'][] = ['ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST', 'BILLING', 'PATIENT']
 
 export function Users() {
+  const { showToast } = useToast()
   const [users, setUsers] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -24,8 +26,8 @@ export function Users() {
     try {
       const data = await usersApi.list()
       setUsers(data)
-    } catch {
-      // silent
+    } catch (err: any) {
+      showToast(err.message || 'Error al cargar usuarios', 'error')
     } finally {
       setIsLoading(false)
     }
@@ -53,11 +55,15 @@ export function Users() {
     try {
       if (editingUser) {
         await usersApi.update(editingUser.id, formData)
+        showToast('Usuario actualizado correctamente', 'success')
       } else {
         await usersApi.create(formData as UserCreate)
+        showToast('Usuario creado correctamente', 'success')
       }
       setIsModalOpen(false)
       fetchUsers()
+    } catch (err: any) {
+      showToast(err.message || 'Error al guardar usuario', 'error')
     } finally {
       setIsSubmitting(false)
     }
@@ -65,8 +71,13 @@ export function Users() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Eliminar este usuario?')) return
-    await usersApi.remove(id)
-    fetchUsers()
+    try {
+      await usersApi.remove(id)
+      showToast('Usuario eliminado correctamente', 'success')
+      fetchUsers()
+    } catch (err: any) {
+      showToast(err.message || 'Error al eliminar usuario', 'error')
+    }
   }
 
   const columns = [

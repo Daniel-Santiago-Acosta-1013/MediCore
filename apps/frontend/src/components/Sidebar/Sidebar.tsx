@@ -6,6 +6,8 @@ import type { User } from '@/types'
 interface SidebarProps {
   collapsed: boolean
   onToggle: () => void
+  mobileMenuOpen: boolean
+  onCloseMobile: () => void
 }
 
 type Role = User['role']
@@ -18,7 +20,7 @@ const navItems: Array<{ path: string; label: string; icon: string; allowedRoles:
   { path: '/appointments', label: 'Citas', icon: 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5', allowedRoles: ['ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST', 'BILLING', 'PATIENT'] },
 ]
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, mobileMenuOpen, onCloseMobile }: SidebarProps) {
   const { user } = useAuth()
   const location = useLocation()
 
@@ -34,7 +36,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   return (
     <aside
-      className={`sidebar ${collapsed ? 'collapsed' : ''}`}
+      className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileMenuOpen ? 'open' : ''}`}
       style={{
         width: collapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)',
       }}
@@ -59,6 +61,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             )}
           </svg>
         </button>
+        <button className="sidebar-close-mobile" onClick={onCloseMobile} aria-label="Cerrar menú">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
 
       <nav className="sidebar-nav">
@@ -68,6 +75,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             href={item.path}
             className={`sidebar-link ${isActive(item.path) ? 'active' : ''}`}
             title={collapsed ? item.label : undefined}
+            onClick={onCloseMobile}
           >
             <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />

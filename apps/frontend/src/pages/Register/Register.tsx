@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/stores/AuthContext'
 import { parseApiError } from '@/utils/errors'
+import { useToast } from '@/stores/ToastContext'
 import { Input } from '@/components/Input/Input'
 import { Button } from '@/components/Button/Button'
 import '../Login/Login.css'
 
 export function Register() {
   const { register } = useAuth()
+  const { showToast } = useToast()
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
@@ -20,8 +22,9 @@ export function Register() {
     setIsLoading(true)
     try {
       await register(email, fullName, password)
-    } catch (err) {
+    } catch (err: any) {
       setError(parseApiError(err))
+      showToast(err.message || 'Error al registrar usuario', 'error')
     } finally {
       setIsLoading(false)
     }

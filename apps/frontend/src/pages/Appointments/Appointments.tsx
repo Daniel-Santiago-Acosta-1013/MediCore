@@ -8,6 +8,7 @@ import { Modal } from '@/components/Modal/Modal'
 import { Loading } from '@/components/Loading/Loading'
 import { EmptyState } from '@/components/EmptyState/EmptyState'
 import { useAuth } from '@/stores/AuthContext'
+import { useToast } from '@/stores/ToastContext'
 import type { Appointment, Doctor } from '@/types'
 import '../Users/Users.css'
 
@@ -15,6 +16,7 @@ const statuses: Appointment['status'][] = ['SCHEDULED', 'COMPLETED', 'CANCELLED'
 
 export function Appointments() {
   const { user } = useAuth()
+  const { showToast } = useToast()
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -30,21 +32,21 @@ export function Appointments() {
     try {
       const data = await appointmentsApi.list()
       setAppointments(data)
-    } catch {
-      // silent
+    } catch (err: any) {
+      showToast(err.message || 'Error al cargar citas', 'error')
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [showToast])
 
   const fetchDoctors = useCallback(async () => {
     try {
       const data = await doctorsApi.list()
       setDoctors(data)
-    } catch {
-      // silent
+    } catch (err: any) {
+      showToast(err.message || 'Error al cargar doctores', 'error')
     }
-  }, [])
+  }, [showToast])
 
   useEffect(() => {
     fetchAppointments()
@@ -72,11 +74,15 @@ export function Appointments() {
     try {
       if (editingAppointment) {
         await appointmentsApi.update(editingAppointment.id, formData)
+        showToast('Cita actualizada correctamente', 'success')
       } else {
         await appointmentsApi.create(formData as Omit<Appointment, 'id' | 'created_at'>)
+        showToast('Cita creada correctamente', 'success')
       }
       setIsModalOpen(false)
       fetchAppointments()
+    } catch (err: any) {
+      showToast(err.message || 'Error al guardar la cita', 'error')
     } finally {
       setIsSubmitting(false)
     }
@@ -84,8 +90,13 @@ export function Appointments() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Eliminar esta cita?')) return
-    await appointmentsApi.remove(id)
-    fetchAppointments()
+    try {
+      await appointmentsApi.remove(id)
+      showToast('Cita eliminada correctamente', 'success')
+      fetchAppointments()
+    } catch (err: any) {
+      showToast(err.message || 'Error al eliminar la cita', 'error')
+    }
   }
 
   const statusBadge = (status: Appointment['status']) => {
@@ -100,7 +111,7 @@ export function Appointments() {
   const columns = [
     { key: 'patient_id', header: 'Paciente' },
     { key: 'doctor_id', header: 'Doctor' },
-    { key: 'scheduled_at', header: 'Fecha', render: (a: Appointment) => a.scheduled_at || '-' },
+    { key: 'appointment_date', header: 'Fecha', render: (a: Appointment) => a.appointment_date || '-' },
     { key: 'status', header: 'Estado', render: (a: Appointment) => statusBadge(a.status) },
     { key: 'notes', header: 'Notas', render: (a: Appointment) => a.notes || '-' },
     {
@@ -192,8 +203,8 @@ export function Appointments() {
           <Input
             label="Fecha y hora"
             type="datetime-local"
-            value={formData.scheduled_at || ''}
-            onChange={(e) => setFormData({ ...formData, scheduled_at: e.target.value })}
+            value={formData.appointment_date || ''}
+            onChange={(e) => setFormData({ ...formData, appointment_date: e.target.value })}
             required
           />
           <div className="input-group">

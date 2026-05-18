@@ -51,7 +51,7 @@ export interface Appointment {
   id: string;
   patient_id: string;
   doctor_id: string;
-  scheduled_at: string;
+  appointment_date: string;
   status: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
   notes: string | null;
   created_at: string;

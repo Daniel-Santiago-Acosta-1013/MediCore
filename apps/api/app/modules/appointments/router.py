@@ -15,7 +15,7 @@ def list_appointments(
     limit: int = 100,
     offset: int = 0,
     conn: Connection = Depends(get_db),
-    current_user=Depends(require_role(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST)),
+    current_user=Depends(require_role(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST, UserRole.PATIENT)),
 ):
     repo = AppointmentRepository(conn)
     service = AppointmentService(repo)
@@ -26,7 +26,7 @@ def list_appointments(
 def get_appointment(
     appointment_id: str,
     conn: Connection = Depends(get_db),
-    current_user=Depends(require_role(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST)),
+    current_user=Depends(require_role(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST, UserRole.PATIENT)),
 ):
     repo = AppointmentRepository(conn)
     service = AppointmentService(repo)
@@ -37,7 +37,7 @@ def get_appointment(
 def create_appointment(
     data: AppointmentCreate,
     conn: Connection = Depends(get_db),
-    current_user=Depends(require_role(UserRole.ADMIN, UserRole.RECEPTIONIST)),
+    current_user=Depends(require_role(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.PATIENT)),
 ):
     repo = AppointmentRepository(conn)
     service = AppointmentService(repo)
@@ -49,7 +49,7 @@ def update_appointment(
     appointment_id: str,
     data: AppointmentUpdate,
     conn: Connection = Depends(get_db),
-    current_user=Depends(require_role(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.DOCTOR)),
+    current_user=Depends(require_role(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.DOCTOR, UserRole.PATIENT)),
 ):
     repo = AppointmentRepository(conn)
     service = AppointmentService(repo)

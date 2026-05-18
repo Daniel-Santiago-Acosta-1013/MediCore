@@ -6,16 +6,25 @@ import './MainLayout.css'
 
 export function MainLayout() {
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
     <div className="app-layout">
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
+      <Sidebar
+        collapsed={collapsed}
+        mobileMenuOpen={mobileMenuOpen}
+        onToggle={() => setCollapsed(!collapsed)}
+        onCloseMobile={() => setMobileMenuOpen(false)}
+      />
       <div className={`main-content ${collapsed ? 'collapsed' : ''}`}>
-        <Header />
+        <Header onMenuToggle={() => setMobileMenuOpen(true)} />
         <main className="page-content">
           <Outlet />
         </main>
       </div>
+      {mobileMenuOpen && (
+        <div className="mobile-overlay" onClick={() => setMobileMenuOpen(false)} />
+      )}
     </div>
   )
 }

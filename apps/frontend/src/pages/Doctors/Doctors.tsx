@@ -7,9 +7,11 @@ import { Modal } from '@/components/Modal/Modal'
 import { Loading } from '@/components/Loading/Loading'
 import { EmptyState } from '@/components/EmptyState/EmptyState'
 import type { Doctor } from '@/types'
+import { useToast } from '@/stores/ToastContext'
 import '../Users/Users.css'
 
 export function Doctors() {
+  const { showToast } = useToast()
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -22,8 +24,8 @@ export function Doctors() {
     try {
       const data = await doctorsApi.list()
       setDoctors(data)
-    } catch {
-      // silent
+    } catch (err: any) {
+      showToast(err.message || 'Error al cargar doctores', 'error')
     } finally {
       setIsLoading(false)
     }
@@ -51,11 +53,15 @@ export function Doctors() {
     try {
       if (editingDoctor) {
         await doctorsApi.update(editingDoctor.id, formData)
+        showToast('Doctor actualizado correctamente', 'success')
       } else {
         await doctorsApi.create(formData as Omit<Doctor, 'id' | 'created_at'>)
+        showToast('Doctor creado correctamente', 'success')
       }
       setIsModalOpen(false)
       fetchDoctors()
+    } catch (err: any) {
+      showToast(err.message || 'Error al guardar doctor', 'error')
     } finally {
       setIsSubmitting(false)
     }
@@ -63,8 +69,13 @@ export function Doctors() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Eliminar este doctor?')) return
-    await doctorsApi.remove(id)
-    fetchDoctors()
+    try {
+      await doctorsApi.remove(id)
+      showToast('Doctor eliminado correctamente', 'success')
+      fetchDoctors()
+    } catch (err: any) {
+      showToast(err.message || 'Error al eliminar doctor', 'error')
+    }
   }
 
   const columns = [

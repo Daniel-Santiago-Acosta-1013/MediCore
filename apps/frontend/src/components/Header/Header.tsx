@@ -1,16 +1,28 @@
 import { useAuth } from '@/stores/AuthContext'
 import './Header.css'
 
-export function Header() {
+interface HeaderProps {
+  onMenuToggle: () => void
+}
+
+export function Header({ onMenuToggle }: HeaderProps) {
   const { user, logout } = useAuth()
 
   return (
     <header className="header">
-      <div className="header-search">
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-        </svg>
-        <input type="text" placeholder="Buscar..." />
+      <div className="header-left">
+        <button className="header-menu-btn" onClick={onMenuToggle} aria-label="Abrir menú">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+        </button>
+
+        <div className="header-search">
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+          </svg>
+          <input type="text" placeholder="Buscar..." />
+        </div>
       </div>
 
       <div className="header-actions">

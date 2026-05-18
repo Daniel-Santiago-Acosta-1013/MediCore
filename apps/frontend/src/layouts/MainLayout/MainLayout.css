@@ -40,14 +40,31 @@
   margin-top: 4px;
 }
 
+.mobile-overlay {
+  display: none;
+}
+
 @media (max-width: 768px) {
-  .sidebar {
-    transform: translateX(-100%);
-  }
-  .sidebar.open {
-    transform: translateX(0);
-  }
   .main-content {
     margin-left: 0 !important;
+  }
+
+  .mobile-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 45;
+    backdrop-filter: blur(2px);
+  }
+}
+
+  .mobile-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 45;
+    backdrop-filter: blur(2px);
   }
 }
