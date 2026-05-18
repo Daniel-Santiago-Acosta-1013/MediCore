@@ -15,7 +15,7 @@ def list_doctors(
     limit: int = 100,
     offset: int = 0,
     conn: Connection = Depends(get_db),
-    current_user=Depends(require_role(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST)),
+    current_user=Depends(require_role(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST, UserRole.PATIENT)),
 ):
     repo = DoctorRepository(conn)
     service = DoctorService(repo)
@@ -26,7 +26,7 @@ def list_doctors(
 def get_doctor(
     doctor_id: str,
     conn: Connection = Depends(get_db),
-    current_user=Depends(require_role(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST)),
+    current_user=Depends(require_role(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST, UserRole.PATIENT)),
 ):
     repo = DoctorRepository(conn)
     service = DoctorService(repo)
