@@ -98,6 +98,20 @@ resource "aws_iam_role_policy_attachment" "alb" {
   role       = aws_iam_role.alb.name
 }
 
+resource "aws_iam_role_policy" "alb_ec2_security_groups_for_vpc" {
+  name = "${var.cluster_name}-alb-ec2-security-groups-for-vpc"
+  role = aws_iam_role.alb.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "ec2:GetSecurityGroupsForVpc"
+      Resource = "*"
+    }]
+  })
+}
+
 # =============================================================================
 # Helm Release: AWS Load Balancer Controller
 # =============================================================================
@@ -141,6 +155,7 @@ resource "helm_release" "alb" {
 
   depends_on = [
     aws_iam_role_policy_attachment.alb,
+    aws_iam_role_policy.alb_ec2_security_groups_for_vpc,
   ]
 }
 

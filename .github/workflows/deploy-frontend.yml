@@ -64,7 +64,14 @@ jobs:
       - name: Deploy Frontend to EKS
         run: |
           IMAGE_TAG="${{ github.event.inputs.image_tag || github.sha }}"
+          CURRENT_API_IMAGE="$(kubectl get deployment/aws-api-gateway-prod -n medicore-env-dev -o jsonpath='{.spec.template.spec.containers[?(@.name=="api-gateway")].image}' 2>/dev/null || true)"
+          if [ -z "$CURRENT_API_IMAGE" ]; then
+            CURRENT_API_IMAGE="${{ env.ECR_REGISTRY }}/medicore-api:latest"
+          fi
+
           cd infrastructure/k8s/overlays/aws
-          kustomize edit set image medicore-frontend=${{ env.ECR_REGISTRY }}/medicore-frontend:$IMAGE_TAG
+          kustomize edit set image \
+            medicore-api="$CURRENT_API_IMAGE" \
+            medicore-frontend=${{ env.ECR_REGISTRY }}/medicore-frontend:$IMAGE_TAG
           kustomize build . | kubectl apply -f -
           kubectl rollout status deployment/aws-frontend-app-prod -n medicore-env-dev --timeout=300s
