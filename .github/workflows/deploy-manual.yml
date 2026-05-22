@@ -74,16 +74,16 @@ jobs:
         if: ${{ github.event.inputs.action == 'plan' }}
         run: |
           cd ${{ env.TG_DIR }}
-          terragrunt run-all plan --terragrunt-non-interactive
+          terragrunt --non-interactive run --all -- plan
 
       - name: Terragrunt apply all
         if: ${{ github.event.inputs.action == 'apply' }}
         run: |
           cd ${{ env.TG_DIR }}
-          terragrunt run-all apply --terragrunt-non-interactive -auto-approve
+          terragrunt --non-interactive run --all -- apply -auto-approve
 
       - name: Terragrunt destroy all
         if: ${{ github.event.inputs.action == 'destroy' }}
         run: |
           cd ${{ env.TG_DIR }}
-          terragrunt run-all destroy --terragrunt-non-interactive -auto-approve
+          terragrunt --non-interactive run --all -- destroy -auto-approve

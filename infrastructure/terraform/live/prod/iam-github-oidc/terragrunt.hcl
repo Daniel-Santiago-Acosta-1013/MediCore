@@ -1,5 +1,5 @@
 include "root" {
-  path   = find_in_parent_folders()
+  path   = find_in_parent_folders("root.hcl")
   expose = true
 }
 
@@ -16,5 +16,5 @@ inputs = {
   github_org      = "Daniel-Santiago-Acosta-1013"
   github_repo     = "MediCore"
   github_branches = ["main", "develop"]
-  tags = include.root.inputs.tags
+  tags            = include.root.inputs.tags
 }

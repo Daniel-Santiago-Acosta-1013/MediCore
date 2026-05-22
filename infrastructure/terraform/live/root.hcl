@@ -45,10 +45,10 @@ EOF
 # =============================================================================
 
 inputs = {
-  aws_region    = "us-east-1"
-  environment   = "prod"
-  project_name  = "medicore"
-  cluster_name  = "medicore-eks-prod"
+  aws_region   = "us-east-1"
+  environment  = "prod"
+  project_name = "medicore"
+  cluster_name = "medicore-eks-prod"
   tags = {
     Project     = "medicore"
     Environment = "prod"
