@@ -3,150 +3,30 @@ name: Manual Deploy / Infra Management
 on:
   workflow_dispatch:
     inputs:
-      mode:
-        description: 'Modo de ejecución'
+      action:
+        description: 'Infra action: plan previews, apply deploys everything, destroy removes project infra but keeps the remote state bucket.'
         required: true
-        default: 'services'
-        type: choice
-        options:
-          - services
-          - infrastructure
-      service:
-        description: 'Servicio a desplegar (solo para modo services)'
-        required: false
-        default: 'both'
-        type: choice
-        options:
-          - api
-          - frontend
-          - both
-      terraform_action:
-        description: 'Acción de Terraform (solo para modo infrastructure)'
-        required: false
         default: 'plan'
         type: choice
         options:
           - plan
           - apply
           - destroy
-      module:
-        description: 'Módulo a ejecutar (solo para modo infrastructure)'
-        required: false
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - vpc
-          - eks
-          - ecr
-          - rds
-          - iam-github-oidc
-          - alb-ingress-controller
       confirm_destroy:
-        description: 'Confirmar destroy: escribe DESTROY para confirmar'
+        description: 'Required only for destroy. Type DESTROY to remove all project infrastructure.'
         required: false
         type: string
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
-  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
-  EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
   TF_VERSION: '1.5.7'
   TG_VERSION: '0.98.0'
   TG_DIR: 'infrastructure/terraform/live/prod'
 
 jobs:
-  # ===========================================================================
-  # SERVICES MODE: Build, push images and deploy to EKS
-  # ===========================================================================
-  deploy-services:
-    name: Deploy Services to EKS
-    runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.mode == 'services' }}
-    permissions:
-      id-token: write
-      contents: read
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      # -------------------------------------------------------------------------
-      # API Build & Push (conditional)
-      # -------------------------------------------------------------------------
-      - name: Build, tag, and push API image
-        if: ${{ github.event.inputs.service == 'api' || github.event.inputs.service == 'both' }}
-        working-directory: apps/api
-        run: |
-          IMAGE_TAG=${{ github.sha }}
-          docker build -t ${{ env.ECR_REGISTRY }}/medicore-api:$IMAGE_TAG .
-          docker push ${{ env.ECR_REGISTRY }}/medicore-api:$IMAGE_TAG
-
-      # -------------------------------------------------------------------------
-      # Frontend Build & Push (conditional)
-      # -------------------------------------------------------------------------
-      - name: Build, tag, and push Frontend image
-        if: ${{ github.event.inputs.service == 'frontend' || github.event.inputs.service == 'both' }}
-        working-directory: apps/frontend
-        run: |
-          IMAGE_TAG=${{ github.sha }}
-          docker build -t ${{ env.ECR_REGISTRY }}/medicore-frontend:$IMAGE_TAG .
-          docker push ${{ env.ECR_REGISTRY }}/medicore-frontend:$IMAGE_TAG
-
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v4
-        with:
-          version: 'v1.31.0'
-
-      - name: Setup Kustomize
-        run: |
-          curl -sSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz" | tar -xz -C /usr/local/bin
-          kustomize version
-
-      - name: Update kubeconfig
-        run: |
-          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
-
-      # -------------------------------------------------------------------------
-      # API Deploy (conditional)
-      # -------------------------------------------------------------------------
-      - name: Deploy API to EKS
-        if: ${{ github.event.inputs.service == 'api' || github.event.inputs.service == 'both' }}
-        run: |
-          cd infrastructure/k8s/overlays/aws
-          kustomize edit set image medicore-api=${{ env.ECR_REGISTRY }}/medicore-api:${{ github.sha }}
-          kustomize build . | kubectl apply -f -
-          kubectl rollout status deployment/aws-api-gateway-prod -n medicore-env-dev --timeout=300s
-
-      # -------------------------------------------------------------------------
-      # Frontend Deploy (conditional)
-      # -------------------------------------------------------------------------
-      - name: Deploy Frontend to EKS
-        if: ${{ github.event.inputs.service == 'frontend' || github.event.inputs.service == 'both' }}
-        run: |
-          cd infrastructure/k8s/overlays/aws
-          kustomize edit set image medicore-frontend=${{ env.ECR_REGISTRY }}/medicore-frontend:${{ github.sha }}
-          kustomize build . | kubectl apply -f -
-          kubectl rollout status deployment/aws-frontend-app-prod -n medicore-env-dev --timeout=300s
-
-  # ===========================================================================
-  # INFRASTRUCTURE MODE: Terraform / Terragrunt Plan, Apply, Destroy
-  # ===========================================================================
   manage-infrastructure:
-    name: Manage Infrastructure
+    name: ${{ github.event.inputs.action }} all infrastructure
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.mode == 'infrastructure' }}
     permissions:
       id-token: write
       contents: read
@@ -173,55 +53,33 @@ jobs:
           chmod +x /usr/local/bin/terragrunt
           terragrunt --version
 
-      # -------------------------------------------------------------------------
-      # Destroy confirmation check
-      # -------------------------------------------------------------------------
-      - name: Verify destroy confirmation
-        if: ${{ github.event.inputs.terraform_action == 'destroy' }}
+      - name: Confirm destroy
+        if: ${{ github.event.inputs.action == 'destroy' }}
         run: |
           if [ "${{ github.event.inputs.confirm_destroy }}" != "DESTROY" ]; then
-            echo "ERROR: Para destruir infraestructura debes escribir 'DESTROY' en confirm_destroy."
+            echo "ERROR: To destroy all project infrastructure, set confirm_destroy to DESTROY."
             exit 1
           fi
 
-      # -------------------------------------------------------------------------
-      # PLAN / APPLY / DESTROY for ALL modules
-      # -------------------------------------------------------------------------
-      - name: Terragrunt run-all plan
-        if: ${{ github.event.inputs.terraform_action == 'plan' && github.event.inputs.module == 'all' }}
+      - name: Explain scope
+        run: |
+          echo "This workflow manages every Terragrunt module under ${{ env.TG_DIR }}."
+          echo "The Terraform remote state S3 bucket is configured as an external backend and is not part of this destroy scope."
+
+      - name: Terragrunt plan all
+        if: ${{ github.event.inputs.action == 'plan' }}
         run: |
           cd ${{ env.TG_DIR }}
           terragrunt run-all plan --terragrunt-non-interactive
 
-      - name: Terragrunt run-all apply
-        if: ${{ github.event.inputs.terraform_action == 'apply' && github.event.inputs.module == 'all' }}
+      - name: Terragrunt apply all
+        if: ${{ github.event.inputs.action == 'apply' }}
         run: |
           cd ${{ env.TG_DIR }}
-          terragrunt run-all apply --terragrunt-non-interactive
+          terragrunt run-all apply --terragrunt-non-interactive -auto-approve
 
-      - name: Terragrunt run-all destroy
-        if: ${{ github.event.inputs.terraform_action == 'destroy' && github.event.inputs.module == 'all' }}
+      - name: Terragrunt destroy all
+        if: ${{ github.event.inputs.action == 'destroy' }}
         run: |
           cd ${{ env.TG_DIR }}
-          terragrunt run-all destroy --terragrunt-non-interactive
-
-      # -------------------------------------------------------------------------
-      # PLAN / APPLY / DESTROY for SINGLE module
-      # -------------------------------------------------------------------------
-      - name: Terragrunt plan (single module)
-        if: ${{ github.event.inputs.terraform_action == 'plan' && github.event.inputs.module != 'all' }}
-        run: |
-          cd ${{ env.TG_DIR }}/${{ github.event.inputs.module }}
-          terragrunt plan
-
-      - name: Terragrunt apply (single module)
-        if: ${{ github.event.inputs.terraform_action == 'apply' && github.event.inputs.module != 'all' }}
-        run: |
-          cd ${{ env.TG_DIR }}/${{ github.event.inputs.module }}
-          terragrunt apply -auto-approve
-
-      - name: Terragrunt destroy (single module)
-        if: ${{ github.event.inputs.terraform_action == 'destroy' && github.event.inputs.module != 'all' }}
-        run: |
-          cd ${{ env.TG_DIR }}/${{ github.event.inputs.module }}
-          terragrunt destroy -auto-approve
+          terragrunt run-all destroy --terragrunt-non-interactive -auto-approve

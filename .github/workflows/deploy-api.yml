@@ -7,6 +7,12 @@ on:
       - 'apps/api/**'
       - 'infrastructure/k8s/base/api-gateway/**'
       - '.github/workflows/deploy-api.yml'
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to build and deploy. Leave empty to use the selected commit SHA.'
+        required: false
+        type: string
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -39,7 +45,7 @@ jobs:
       - name: Build, tag, and push API image
         working-directory: apps/api
         run: |
-          IMAGE_TAG=${{ github.sha }}
+          IMAGE_TAG="${{ github.event.inputs.image_tag || github.sha }}"
           docker build -t ${{ env.ECR_REGISTRY }}/medicore-api:$IMAGE_TAG .
           docker push ${{ env.ECR_REGISTRY }}/medicore-api:$IMAGE_TAG
 
@@ -59,7 +65,8 @@ jobs:
 
       - name: Deploy API to EKS
         run: |
+          IMAGE_TAG="${{ github.event.inputs.image_tag || github.sha }}"
           cd infrastructure/k8s/overlays/aws
-          kustomize edit set image medicore-api=${{ env.ECR_REGISTRY }}/medicore-api:${{ github.sha }}
+          kustomize edit set image medicore-api=${{ env.ECR_REGISTRY }}/medicore-api:$IMAGE_TAG
           kustomize build . | kubectl apply -f -
           kubectl rollout status deployment/aws-api-gateway-prod -n medicore-env-dev --timeout=300s
