@@ -1,6 +1,6 @@
 # =============================================================================
 # Module: EKS
-# Blueprint reutilizable para cluster EKS con node group managed.
+# Blueprint reutilizable para cluster EKS con Fargate profiles.
 # =============================================================================
 
 variable "cluster_name" {
@@ -20,32 +20,17 @@ variable "vpc_id" {
 }
 
 variable "subnet_ids" {
-  description = "IDs de subnets privadas para el cluster y nodes"
+  description = "IDs de subnets privadas para el cluster y Fargate pods"
   type        = list(string)
 }
 
-variable "node_instance_types" {
-  description = "Tipos de instancia para los nodos"
-  type        = list(string)
-  default     = ["t3.medium"]
-}
-
-variable "node_desired_size" {
-  description = "Cantidad deseada de nodos"
-  type        = number
-  default     = 2
-}
-
-variable "node_min_size" {
-  description = "Cantidad mínima de nodos"
-  type        = number
-  default     = 2
-}
-
-variable "node_max_size" {
-  description = "Cantidad máxima de nodos"
-  type        = number
-  default     = 4
+variable "fargate_profiles" {
+  description = "Fargate profiles keyed by profile name"
+  type = map(object({
+    namespace = string
+    labels    = optional(map(string), {})
+  }))
+  default = {}
 }
 
 # =============================================================================
@@ -80,11 +65,11 @@ resource "aws_iam_role_policy_attachment" "cluster_policies" {
 }
 
 # =============================================================================
-# IAM Role para el node group
+# IAM Role para Fargate pod execution
 # =============================================================================
 
-resource "aws_iam_role" "node" {
-  name = "${var.cluster_name}-node-role"
+resource "aws_iam_role" "fargate_pod_execution" {
+  name = "${var.cluster_name}-fargate-pod-execution-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -92,7 +77,7 @@ resource "aws_iam_role" "node" {
       Action = "sts:AssumeRole"
       Effect = "Allow"
       Principal = {
-        Service = "ec2.amazonaws.com"
+        Service = "eks-fargate-pods.amazonaws.com"
       }
     }]
   })
@@ -100,15 +85,9 @@ resource "aws_iam_role" "node" {
   tags = var.tags
 }
 
-resource "aws_iam_role_policy_attachment" "node_policies" {
-  for_each = toset([
-    "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
-    "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
-    "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
-  ])
-
-  policy_arn = each.value
-  role       = aws_iam_role.node.name
+resource "aws_iam_role_policy_attachment" "fargate_pod_execution" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSFargatePodExecutionRolePolicy"
+  role       = aws_iam_role.fargate_pod_execution.name
 }
 
 # =============================================================================
@@ -177,29 +156,56 @@ resource "aws_iam_openid_connect_provider" "eks" {
 }
 
 # =============================================================================
-# Node Group Managed
+# Fargate Profiles
 # =============================================================================
 
-resource "aws_eks_node_group" "this" {
-  cluster_name    = aws_eks_cluster.this.name
-  node_group_name = "${var.cluster_name}-nodes"
-  node_role_arn   = aws_iam_role.node.arn
-  subnet_ids      = var.subnet_ids
+resource "aws_eks_fargate_profile" "this" {
+  for_each = var.fargate_profiles
 
-  scaling_config {
-    desired_size = var.node_desired_size
-    min_size     = var.node_min_size
-    max_size     = var.node_max_size
-  }
+  cluster_name           = aws_eks_cluster.this.name
+  fargate_profile_name   = each.key
+  pod_execution_role_arn = aws_iam_role.fargate_pod_execution.arn
+  subnet_ids             = var.subnet_ids
 
-  instance_types = var.node_instance_types
-
-  update_config {
-    max_unavailable = 1
+  selector {
+    namespace = each.value.namespace
+    labels    = each.value.labels
   }
 
   depends_on = [
-    aws_iam_role_policy_attachment.node_policies,
+    aws_iam_role_policy_attachment.fargate_pod_execution,
+  ]
+
+  tags = merge(var.tags, {
+    Name = "${var.cluster_name}-${each.key}"
+  })
+}
+
+resource "aws_eks_addon" "coredns" {
+  cluster_name                = aws_eks_cluster.this.name
+  addon_name                  = "coredns"
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  configuration_values = jsonencode({
+    computeType = "Fargate"
+  })
+
+  depends_on = [
+    aws_eks_fargate_profile.this,
+  ]
+
+  tags = var.tags
+}
+
+resource "aws_eks_addon" "vpc_cni" {
+  cluster_name                = aws_eks_cluster.this.name
+  addon_name                  = "vpc-cni"
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  depends_on = [
+    aws_eks_cluster.this,
   ]
 
   tags = var.tags
@@ -225,8 +231,8 @@ output "cluster_security_group_id" {
   value = aws_security_group.cluster.id
 }
 
-output "node_role_arn" {
-  value = aws_iam_role.node.arn
+output "fargate_pod_execution_role_arn" {
+  value = aws_iam_role.fargate_pod_execution.arn
 }
 
 output "oidc_provider_arn" {

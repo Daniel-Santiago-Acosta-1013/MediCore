@@ -22,13 +22,26 @@ dependency "vpc" {
 }
 
 inputs = {
-  cluster_name        = include.root.inputs.cluster_name
-  cluster_version     = "1.31"
-  vpc_id              = dependency.vpc.outputs.vpc_id
-  subnet_ids          = dependency.vpc.outputs.private_subnet_ids
-  node_instance_types = ["t3.medium"]
-  node_desired_size   = 2
-  node_min_size       = 2
-  node_max_size       = 4
-  tags                = include.root.inputs.tags
+  cluster_name    = include.root.inputs.cluster_name
+  cluster_version = "1.31"
+  vpc_id          = dependency.vpc.outputs.vpc_id
+  subnet_ids      = dependency.vpc.outputs.private_subnet_ids
+  fargate_profiles = {
+    app = {
+      namespace = "medicore-env-dev"
+    }
+    coredns = {
+      namespace = "kube-system"
+      labels = {
+        k8s-app = "kube-dns"
+      }
+    }
+    aws_load_balancer_controller = {
+      namespace = "kube-system"
+      labels = {
+        "app.kubernetes.io/name" = "aws-load-balancer-controller"
+      }
+    }
+  }
+  tags = include.root.inputs.tags
 }

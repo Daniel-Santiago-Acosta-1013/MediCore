@@ -134,6 +134,11 @@ resource "helm_release" "alb" {
     value = var.vpc_id
   }
 
+  set {
+    name  = "region"
+    value = var.aws_region
+  }
+
   depends_on = [
     aws_iam_role_policy_attachment.alb,
   ]
