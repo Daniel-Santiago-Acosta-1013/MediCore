@@ -1,0 +1,65 @@
+name: Deploy Frontend to AWS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/frontend/**'
+      - 'infrastructure/k8s/base/frontend-app/**'
+      - '.github/workflows/deploy-frontend.yml'
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+  EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+
+jobs:
+  build-and-deploy-frontend:
+    name: Build & Deploy Frontend
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push Frontend image
+        working-directory: apps/frontend
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          docker build -t ${{ env.ECR_REGISTRY }}/medicore-frontend:$IMAGE_TAG .
+          docker push ${{ env.ECR_REGISTRY }}/medicore-frontend:$IMAGE_TAG
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.31.0'
+
+      - name: Setup Kustomize
+        run: |
+          curl -sSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz" | tar -xz -C /usr/local/bin
+          kustomize version
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Deploy Frontend to EKS
+        run: |
+          cd infrastructure/k8s/overlays/aws
+          kustomize edit set image medicore-frontend=${{ env.ECR_REGISTRY }}/medicore-frontend:${{ github.sha }}
+          kustomize build . | kubectl apply -f -
+          kubectl rollout status deployment/aws-frontend-app-prod -n medicore-env-dev --timeout=300s

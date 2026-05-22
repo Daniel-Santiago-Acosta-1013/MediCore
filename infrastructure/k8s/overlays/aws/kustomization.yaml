@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base/namespaces
+  - ../../base/api-gateway
+  - ../../base/frontend-app
+  - ../../base/patient-service
+  - ingress.yaml
+
+namePrefix: aws-
+nameSuffix: -prod
+
+labels:
+  - includeSelectors: true
+    pairs:
+      environment: prod
+      cluster: medicore-prod
+
+commonAnnotations:
+  medicore.io/managed-by: kustomize
+  medicore.io/environment: aws-prod
+
+images:
+  - name: medicore-api
+    newName: 745819688993.dkr.ecr.us-east-1.amazonaws.com/medicore-api
+    newTag: latest
+  - name: medicore-frontend
+    newName: 745819688993.dkr.ecr.us-east-1.amazonaws.com/medicore-frontend
+    newTag: latest
