@@ -46,28 +46,59 @@ jobs:
           chmod +x /usr/local/bin/terragrunt
           terragrunt --version
 
-      - name: Check destroy plan
-        id: destroy-plan
+      - name: Check managed resources
+        id: managed-resources
         run: |
-          cd ${{ env.TG_DIR }}
-          set +e
-          terragrunt run-all plan -destroy -detailed-exitcode --terragrunt-non-interactive
-          exit_code=$?
-          set -e
+          modules=(
+            alb-ingress-controller
+            rds
+            eks
+            ecr
+            iam-github-oidc
+            vpc
+          )
 
-          if [ "$exit_code" -eq 0 ]; then
-            echo "should_destroy=false" >> "$GITHUB_OUTPUT"
-            echo "No project infrastructure found to destroy."
-          elif [ "$exit_code" -eq 2 ]; then
+          should_destroy=false
+
+          for module in "${modules[@]}"; do
+            module_dir="${{ env.TG_DIR }}/${module}"
+            echo "Checking Terraform state for ${module}..."
+
+            cd "$module_dir"
+            terragrunt init -input=false -no-color
+
+            set +e
+            state_output="$(terragrunt state list -no-color 2>&1)"
+            state_exit=$?
+            set -e
+
+            if [ "$state_exit" -eq 0 ]; then
+              resource_count="$(printf '%s\n' "$state_output" | sed '/^$/d' | wc -l | tr -d ' ')"
+              echo "${module}: ${resource_count} managed resources"
+
+              if [ "$resource_count" -gt 0 ]; then
+                should_destroy=true
+              fi
+            elif printf '%s\n' "$state_output" | grep -Eiq 'No state file was found'; then
+              echo "${module}: no readable managed state found, skipping."
+            else
+              printf '%s\n' "$state_output"
+              exit "$state_exit"
+            fi
+
+            cd - >/dev/null
+          done
+
+          if [ "$should_destroy" = "true" ]; then
             echo "should_destroy=true" >> "$GITHUB_OUTPUT"
             echo "Project infrastructure exists and will be destroyed."
           else
-            echo "Destroy plan failed with exit code $exit_code."
-            exit "$exit_code"
+            echo "should_destroy=false" >> "$GITHUB_OUTPUT"
+            echo "No project infrastructure found to destroy."
           fi
 
       - name: Destroy all project infrastructure
-        if: ${{ steps.destroy-plan.outputs.should_destroy == 'true' }}
+        if: ${{ steps.managed-resources.outputs.should_destroy == 'true' }}
         run: |
           cd ${{ env.TG_DIR }}
           terragrunt run-all destroy --terragrunt-non-interactive -auto-approve
