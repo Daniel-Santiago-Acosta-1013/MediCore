@@ -1,0 +1,78 @@
+name: Scheduled Infra Cleanup
+
+on:
+  schedule:
+    # 3:00 a.m. Colombia time (America/Bogota, UTC-5).
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  TF_VERSION: '1.5.7'
+  TG_VERSION: '0.98.0'
+  TG_DIR: 'infrastructure/terraform/live/prod'
+
+concurrency:
+  group: medicore-infra-management
+  cancel-in-progress: false
+
+jobs:
+  cleanup-infrastructure:
+    name: Destroy project infrastructure if present
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Setup Terragrunt
+        run: |
+          curl -sL "https://github.com/gruntwork-io/terragrunt/releases/download/v${{ env.TG_VERSION }}/terragrunt_linux_amd64" -o /usr/local/bin/terragrunt
+          chmod +x /usr/local/bin/terragrunt
+          terragrunt --version
+
+      - name: Check destroy plan
+        id: destroy-plan
+        run: |
+          cd ${{ env.TG_DIR }}
+          set +e
+          terragrunt run-all plan -destroy -detailed-exitcode --terragrunt-non-interactive
+          exit_code=$?
+          set -e
+
+          if [ "$exit_code" -eq 0 ]; then
+            echo "should_destroy=false" >> "$GITHUB_OUTPUT"
+            echo "No project infrastructure found to destroy."
+          elif [ "$exit_code" -eq 2 ]; then
+            echo "should_destroy=true" >> "$GITHUB_OUTPUT"
+            echo "Project infrastructure exists and will be destroyed."
+          else
+            echo "Destroy plan failed with exit code $exit_code."
+            exit "$exit_code"
+          fi
+
+      - name: Destroy all project infrastructure
+        if: ${{ steps.destroy-plan.outputs.should_destroy == 'true' }}
+        run: |
+          cd ${{ env.TG_DIR }}
+          terragrunt run-all destroy --terragrunt-non-interactive -auto-approve
+
+      - name: Confirm remote state backend is preserved
+        run: |
+          echo "The Terraform remote state S3 bucket is configured as an external backend."
+          echo "It is not managed by these Terragrunt modules, so this cleanup leaves it intact."

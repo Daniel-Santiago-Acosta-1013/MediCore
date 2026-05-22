@@ -23,6 +23,10 @@ env:
   TG_VERSION: '0.98.0'
   TG_DIR: 'infrastructure/terraform/live/prod'
 
+concurrency:
+  group: medicore-infra-management
+  cancel-in-progress: false
+
 jobs:
   manage-infrastructure:
     name: ${{ github.event.inputs.action }} all infrastructure

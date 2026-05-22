@@ -20,10 +20,10 @@ dependency "eks" {
 }
 
 inputs = {
-  identifier             = "medicore-postgres-prod"
+  identifier             = "medicore-aurora-postgres-prod"
   engine_version         = "16.4"
-  instance_class         = "db.t3.micro"
-  allocated_storage      = 20
+  instance_class         = "db.t4g.medium"
+  instance_count         = 1
   db_name                = "medicore"
   username               = "medicore"
   vpc_id                 = dependency.vpc.outputs.vpc_id

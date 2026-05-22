@@ -21,6 +21,24 @@ commonAnnotations:
   medicore.io/managed-by: kustomize
   medicore.io/environment: aws-prod
 
+patches:
+  - target:
+      kind: ConfigMap
+      name: api-config
+    patch: |-
+      - op: remove
+        path: /data/DATABASE_URL
+      - op: remove
+        path: /data/POSTGRES_HOST
+      - op: remove
+        path: /data/POSTGRES_PORT
+      - op: remove
+        path: /data/POSTGRES_USER
+      - op: remove
+        path: /data/POSTGRES_PASSWORD
+      - op: remove
+        path: /data/POSTGRES_DB
+
 images:
   - name: medicore-api
     newName: 745819688993.dkr.ecr.us-east-1.amazonaws.com/medicore-api

@@ -29,6 +29,9 @@ spec:
         envFrom:
         - configMapRef:
             name: api-config
+        - secretRef:
+            name: api-db-secret
+            optional: true
         resources:
           requests:
             memory: "128Mi"
