@@ -5,13 +5,19 @@
 
 grafana:
   enabled: true
+  defaultDashboardsEnabled: false
   adminPassword: "medicore"
   persistence:
     enabled: false
   sidecar:
     dashboards:
       enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      folderAnnotation: grafana_folder
       searchNamespace: ALL
+      provider:
+        allowUiUpdates: true
   ingress:
     enabled: false
 
@@ -46,4 +52,4 @@ kube-state-metrics:
   enabled: true
 
 prometheus-node-exporter:
-  enabled: true
+  enabled: false
