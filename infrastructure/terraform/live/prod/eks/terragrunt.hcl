@@ -42,6 +42,9 @@ inputs = {
         "app.kubernetes.io/name" = "aws-load-balancer-controller"
       }
     }
+    observability = {
+      namespace = "medicore-monitoring-env-dev"
+    }
   }
   tags = include.root.inputs.tags
 }

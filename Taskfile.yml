@@ -15,6 +15,8 @@ vars:
   MONITORING_NAMESPACE: medicore-monitoring-env-dev
   OBSERVABILITY_RELEASE: medicore-observability
   OBSERVABILITY_VALUES: infrastructure/k8s/observability/values.yaml
+  LOCAL_KUBE_CONTEXT:
+    sh: echo "${KUBE_CONTEXT:-docker-desktop}"
 
 tasks:
   default:
@@ -94,6 +96,8 @@ tasks:
       - task: _traefik:up
       - task: _metrics:up
       - task: infra:apply
+      - task: observability:install
+      - task: observability:routes
 
   cluster:down:
     desc: Eliminar recursos de MediCore del cluster
@@ -112,8 +116,8 @@ tasks:
   cluster:status:
     desc: Estado de nodos y pods
     cmds:
-      - kubectl get nodes
-      - kubectl get pods,deploy,hpa,svc,ingress -n medicore-env-dev
+      - kubectl --context {{.LOCAL_KUBE_CONTEXT}} get nodes
+      - kubectl --context {{.LOCAL_KUBE_CONTEXT}} get pods,deploy,hpa,svc,ingress -n medicore-env-dev
 
   build:api:
     desc: Build imagen de la API
@@ -128,32 +132,32 @@ tasks:
   infra:apply:
     desc: Aplicar manifiestos Kubernetes
     cmds:
-      - skaffold run
+      - skaffold run --kube-context {{.LOCAL_KUBE_CONTEXT}}
 
   infra:destroy:
     desc: Eliminar recursos de MediCore del cluster
     cmds:
-      - skaffold delete
+      - skaffold delete --kube-context {{.LOCAL_KUBE_CONTEXT}}
 
   k9s:
     desc: Abrir k9s en medicore-env-dev
     cmds:
-      - k9s -n medicore-env-dev
+      - k9s --context {{.LOCAL_KUBE_CONTEXT}} -n medicore-env-dev
 
   k9s:all:
     desc: Abrir k9s en todos los namespaces
     cmds:
-      - k9s --all-namespaces
+      - k9s --context {{.LOCAL_KUBE_CONTEXT}} --all-namespaces
 
   logs:api:
     desc: Logs del API Gateway
     cmds:
-      - kubectl logs -n medicore-env-dev deployment/local-api-gateway-dev -f --tail=100
+      - kubectl --context {{.LOCAL_KUBE_CONTEXT}} logs -n medicore-env-dev deployment/local-api-gateway-dev -f --tail=100
 
   logs:frontend:
     desc: Logs del Frontend
     cmds:
-      - kubectl logs -n medicore-env-dev deployment/local-frontend-app-dev -f --tail=100
+      - kubectl --context {{.LOCAL_KUBE_CONTEXT}} logs -n medicore-env-dev deployment/local-frontend-app-dev -f --tail=100
 
   test:api:
     desc: Tests unitarios del API (local con uv)
@@ -176,20 +180,21 @@ tasks:
     cmds:
       - helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
       - helm repo update
-      - helm upgrade --install {{.OBSERVABILITY_RELEASE}} prometheus-community/kube-prometheus-stack --namespace {{.MONITORING_NAMESPACE}} --create-namespace --values {{.TASKFILE_DIR}}/{{.OBSERVABILITY_VALUES}} --wait --timeout 10m
-      - kubectl apply -f {{.TASKFILE_DIR}}/infrastructure/k8s/observability/dashboard-medicore.yaml
+      - helm --kube-context {{.LOCAL_KUBE_CONTEXT}} upgrade --install {{.OBSERVABILITY_RELEASE}} prometheus-community/kube-prometheus-stack --namespace {{.MONITORING_NAMESPACE}} --create-namespace --values {{.TASKFILE_DIR}}/{{.OBSERVABILITY_VALUES}} --wait --timeout 10m
+      - kubectl --context {{.LOCAL_KUBE_CONTEXT}} delete configmap medicore-focused-dashboard --namespace {{.MONITORING_NAMESPACE}} --ignore-not-found
+      - kubectl --context {{.LOCAL_KUBE_CONTEXT}} apply -f {{.TASKFILE_DIR}}/infrastructure/k8s/observability/dashboard-medicore.yaml
 
   observability:uninstall:
     desc: Desinstalar stack de observabilidad
     cmds:
-      - helm uninstall {{.OBSERVABILITY_RELEASE}} --namespace {{.MONITORING_NAMESPACE}} --ignore-not-found
-      - kubectl delete namespace {{.MONITORING_NAMESPACE}} --ignore-not-found
+      - helm --kube-context {{.LOCAL_KUBE_CONTEXT}} uninstall {{.OBSERVABILITY_RELEASE}} --namespace {{.MONITORING_NAMESPACE}} --ignore-not-found
+      - kubectl --context {{.LOCAL_KUBE_CONTEXT}} delete namespace {{.MONITORING_NAMESPACE}} --ignore-not-found
 
   observability:routes:
     desc: Aplicar IngressRoute de Traefik para Grafana y Prometheus
     cmds:
-      - kubectl apply -f {{.TASKFILE_DIR}}/infrastructure/k8s/observability/ingressroute-grafana.yaml
-      - kubectl apply -f {{.TASKFILE_DIR}}/infrastructure/k8s/observability/ingressroute-prometheus.yaml
+      - kubectl --context {{.LOCAL_KUBE_CONTEXT}} apply -f {{.TASKFILE_DIR}}/infrastructure/k8s/observability/ingressroute-grafana.yaml
+      - kubectl --context {{.LOCAL_KUBE_CONTEXT}} apply -f {{.TASKFILE_DIR}}/infrastructure/k8s/observability/ingressroute-prometheus.yaml
       - 'echo "Grafana  -> http://grafana.localhost   (user: admin / pass: medicore)"'
       - 'echo "Prometheus -> http://prometheus.localhost"'
 
@@ -210,29 +215,49 @@ tasks:
   _cluster:check:
     internal: true
     cmds:
-      - kubectl config current-context
-      - kubectl get nodes
+      - |
+        CONTEXT="{{.LOCAL_KUBE_CONTEXT}}"
+        if ! kubectl config get-contexts "$CONTEXT" >/dev/null 2>&1; then
+          echo "No existe el contexto Kubernetes local '$CONTEXT'."
+          echo "Activa Kubernetes en Docker Desktop o ejecuta: KUBE_CONTEXT=<contexto-local> task cluster:up"
+          echo "Contexto actual: $(kubectl config current-context 2>/dev/null || echo none)"
+          exit 1
+        fi
+
+        case "$CONTEXT" in
+          docker-desktop|rancher-desktop|minikube|kind|kind-*|k3d|k3d-*) ;;
+          *)
+            if [ "${ALLOW_NON_LOCAL_KUBE_CONTEXT:-}" != "true" ]; then
+              echo "Contexto '$CONTEXT' no parece local. Se aborta para no tocar un cluster remoto."
+              echo "Usa KUBE_CONTEXT=<contexto-local> task cluster:up o ALLOW_NON_LOCAL_KUBE_CONTEXT=true si sabes exactamente lo que haces."
+              exit 1
+            fi
+            ;;
+        esac
+
+        echo "Using Kubernetes context: $CONTEXT"
+        kubectl --context "$CONTEXT" get nodes
 
   _traefik:up:
     internal: true
     cmds:
       - helm repo add traefik https://traefik.github.io/charts
       - helm repo update
-      - helm upgrade --install {{.TRAEFIK_RELEASE}} traefik/traefik --namespace {{.TRAEFIK_NAMESPACE}} --create-namespace --set service.type=LoadBalancer --set ports.web.exposedPort=80 --set ports.websecure.exposedPort=443 --wait --timeout 5m
+      - helm --kube-context {{.LOCAL_KUBE_CONTEXT}} upgrade --install {{.TRAEFIK_RELEASE}} traefik/traefik --namespace {{.TRAEFIK_NAMESPACE}} --create-namespace --set service.type=LoadBalancer --set ports.web.exposedPort=80 --set ports.websecure.exposedPort=443 --wait --timeout 5m
 
   _traefik:down:
     internal: true
     cmds:
-      - helm uninstall {{.TRAEFIK_RELEASE}} --namespace {{.TRAEFIK_NAMESPACE}} --ignore-not-found
+      - helm --kube-context {{.LOCAL_KUBE_CONTEXT}} uninstall {{.TRAEFIK_RELEASE}} --namespace {{.TRAEFIK_NAMESPACE}} --ignore-not-found
 
   _metrics:up:
     internal: true
     cmds:
       - helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
       - helm repo update
-      - helm upgrade --install {{.METRICS_RELEASE}} metrics-server/metrics-server --namespace {{.METRICS_NAMESPACE}} --set 'args={--kubelet-insecure-tls}' --wait --timeout 5m
+      - helm --kube-context {{.LOCAL_KUBE_CONTEXT}} upgrade --install {{.METRICS_RELEASE}} metrics-server/metrics-server --namespace {{.METRICS_NAMESPACE}} --set 'args={--kubelet-insecure-tls}' --wait --timeout 5m
 
   _metrics:down:
     internal: true
     cmds:
-      - helm uninstall {{.METRICS_RELEASE}} --namespace {{.METRICS_NAMESPACE}} --ignore-not-found
+      - helm --kube-context {{.LOCAL_KUBE_CONTEXT}} uninstall {{.METRICS_RELEASE}} --namespace {{.METRICS_NAMESPACE}} --ignore-not-found

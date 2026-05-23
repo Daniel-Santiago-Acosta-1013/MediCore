@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react'
+import { reportFrontendError, reportFrontendToast } from '@/api/telemetry'
 import './ToastContext.css'
 
 interface Toast {
@@ -20,6 +21,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const showToast = useCallback((message: string, type: Toast['type'] = 'error') => {
     const id = `${Date.now()}-${Math.random()}`
+    reportFrontendToast(type)
+    if (type === 'error' || type === 'warning') {
+      reportFrontendError('toast', type)
+    }
     setToasts((prev) => [...prev, { id, message, type }])
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id))

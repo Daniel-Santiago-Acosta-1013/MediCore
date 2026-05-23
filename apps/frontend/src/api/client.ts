@@ -1,3 +1,5 @@
+import { reportFrontendApi, reportFrontendError } from './telemetry'
+
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
 class ApiClient {
@@ -9,6 +11,8 @@ class ApiClient {
 
   async request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE}${path}`
+    const method = options.method || 'GET'
+    const start = performance.now()
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...((options.headers as Record<string, string>) || {}),
@@ -18,12 +22,22 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.token}`
     }
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    })
+    let response: Response
+    try {
+      response = await fetch(url, {
+        ...options,
+        headers,
+      })
+    } catch (error) {
+      reportFrontendApi(method, 0, performance.now() - start)
+      reportFrontendError('network', error instanceof Error ? error.name : 'NetworkError')
+      throw error
+    }
+
+    reportFrontendApi(method, response.status, performance.now() - start)
 
     if (!response.ok) {
+      reportFrontendError('api', `HTTP_${response.status}`)
       const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
       const message = typeof error.detail === 'string'
         ? error.detail

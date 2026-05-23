@@ -1,5 +1,6 @@
 from fastapi import HTTPException, status
 from app.core.security import verify_password, get_password_hash, create_access_token
+from app.core.metrics import auth_failures_total
 from app.modules.auth.repository import AuthRepository
 from app.modules.auth.schemas import UserRegister
 
@@ -27,17 +28,20 @@ class AuthService:
     def login(self, username: str, password: str):
         user = self.repo.get_user_by_email(username)
         if not user:
+            auth_failures_total.labels(reason="invalid_credentials").inc()
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         if not user["is_active"]:
+            auth_failures_total.labels(reason="inactive_user").inc()
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User is inactive",
             )
         if not verify_password(password, user["password_hash"]):
+            auth_failures_total.labels(reason="invalid_credentials").inc()
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password",

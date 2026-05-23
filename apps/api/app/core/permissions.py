@@ -3,6 +3,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from app.core.security import decode_access_token
 from app.core.database import get_db
+from app.core.metrics import auth_failures_total, permission_denied_total
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -26,13 +27,16 @@ def get_current_user(token: str = Depends(oauth2_scheme), conn=Depends(get_db)):
     )
     payload = decode_access_token(token)
     if payload is None:
+        auth_failures_total.labels(reason="invalid_token").inc()
         raise credentials_exception
     user_id: str = payload.get("sub")
     if user_id is None:
+        auth_failures_total.labels(reason="invalid_token").inc()
         raise credentials_exception
     repo = AuthRepository(conn)
     user = repo.get_user_by_id(user_id)
     if user is None:
+        auth_failures_total.labels(reason="invalid_token_user_not_found").inc()
         raise credentials_exception
     return user
 
@@ -40,6 +44,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), conn=Depends(get_db)):
 def require_role(*roles: UserRole):
     def role_checker(current_user=Depends(get_current_user)):
         if current_user["role"] not in [r.value for r in roles]:
+            permission_denied_total.labels(role=current_user["role"], endpoint="role_guard").inc()
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Insufficient permissions",
