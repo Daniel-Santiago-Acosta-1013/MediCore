@@ -41,6 +41,7 @@ jobs:
           account_id="$(aws sts get-caller-identity --query Account --output text)"
           state_bucket="medicore-terraform-state-${account_id}"
           module_names=(
+            observability
             alb-ingress-controller
             rds
             eks
@@ -98,6 +99,74 @@ jobs:
           curl -sL "https://github.com/gruntwork-io/terragrunt/releases/download/v${{ env.TG_VERSION }}/terragrunt_linux_amd64" -o /usr/local/bin/terragrunt
           chmod +x /usr/local/bin/terragrunt
           terragrunt --version
+
+      - name: Setup kubectl
+        if: ${{ steps.managed-resources.outputs.should_destroy == 'true' }}
+        run: |
+          curl -sLO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          mv kubectl /usr/local/bin/kubectl
+          kubectl version --client
+
+      - name: Pre-cleanup Kubernetes resources
+        if: ${{ steps.managed-resources.outputs.should_destroy == 'true' }}
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name medicore-eks-prod
+
+          echo "Deleting all Ingress resources across all namespaces..."
+          kubectl delete ingress --all --all-namespaces --ignore-not-found=true || true
+
+          echo "Deleting all LoadBalancer Services across all namespaces..."
+          kubectl delete svc -A --field-selector type=LoadBalancer --ignore-not-found=true || true
+
+          echo "Waiting 90s for AWS Load Balancer Controller to reconcile and remove ALBs..."
+          sleep 90
+
+      - name: Cleanup orphaned AWS resources
+        if: ${{ steps.managed-resources.outputs.should_destroy == 'true' }}
+        run: |
+          echo "Looking up VPC ID by cluster tag..."
+          VPC_ID=$(aws ec2 describe-vpcs \
+            --filters "Name=tag:Name,Values=medicore-eks-prod" \
+            --query 'Vpcs[0].VpcId' --output text 2>/dev/null || echo "")
+
+          if [ -z "$VPC_ID" ] || [ "$VPC_ID" = "None" ]; then
+            echo "No VPC found with tag Name=medicore-eks-prod. Trying by kubernetes.io/cluster tag..."
+            VPC_ID=$(aws ec2 describe-vpcs \
+              --filters "Name=tag-key,Values=kubernetes.io/cluster/medicore-eks-prod" \
+              --query 'Vpcs[0].VpcId' --output text 2>/dev/null || echo "")
+          fi
+
+          if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
+            echo "Found VPC: $VPC_ID"
+
+            echo "Deleting Load Balancers (ALBs/NLBs) in VPC $VPC_ID..."
+            for arn in $(aws elbv2 describe-load-balancers \
+              --query "LoadBalancers[?VpcId=='$VPC_ID'].LoadBalancerArn" --output text 2>/dev/null); do
+              echo "  Deleting load balancer $arn"
+              aws elbv2 delete-load-balancer --load-balancer-arn "$arn" || true
+            done
+
+            echo "Deleting Target Groups associated with VPC $VPC_ID..."
+            for arn in $(aws elbv2 describe-target-groups \
+              --query "TargetGroups[?VpcId=='$VPC_ID'].TargetGroupArn" --output text 2>/dev/null); do
+              echo "  Deleting target group $arn"
+              aws elbv2 delete-target-group --target-group-arn "$arn" || true
+            done
+
+            echo "Deleting available Network Interfaces in VPC $VPC_ID..."
+            for eni in $(aws ec2 describe-network-interfaces \
+              --filters "Name=vpc-id,Values=$VPC_ID" \
+              --query 'NetworkInterfaces[?Status==`available`].NetworkInterfaceId' --output text 2>/dev/null); do
+              echo "  Deleting ENI $eni"
+              aws ec2 delete-network-interface --network-interface-id "$eni" || true
+            done
+
+            echo "Waiting 30s for AWS to finish detaching dependent resources..."
+            sleep 30
+          else
+            echo "No VPC found. Skipping orphaned AWS resource cleanup."
+          fi
 
       - name: Destroy all project infrastructure
         if: ${{ steps.managed-resources.outputs.should_destroy == 'true' }}
